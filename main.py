@@ -5,6 +5,8 @@ Date created: 2021/01/13
 Last modified: 2021/01/13
 Description: Training a sequence-to-sequence Transformer for automatic speech recognition.
 """
+
+
 """
 ## Introduction
 Automatic speech recognition (ASR) consists of transcribing audio speech segments into text.
@@ -30,7 +32,9 @@ from glob import glob
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-
+import librosa
+import re
+import numpy as np
 
 """
 ## Define the Transformer Input Layer
@@ -284,9 +288,10 @@ takes ~5 minutes for the extraction of files.
 #     cache_dir=".",
 # )
 
-
-saveto = "./datasets/torgoSession1"
+# can remove this
+saveto = "./datasets/torgoFC01"
 wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
+
 
 id_to_text = {}
 with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
@@ -296,7 +301,65 @@ with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
         id_to_text[id] = text
         print(id_to_text[id] + " id_to_text")
         print(id + " id")
+# ////////////////////////////////////////////////
+def get_audio_path(speaker):
+    """
+    Returns path to audio files belonging to specified speaker
+    :param speaker: string
+                       string encoding the speaker
+    :return: list of strings
+                the strings represent file paths.
+    """
+    print(glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker)))
+    return glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker))
 
+def get_data_TORGO(wavs,maxlen=5000):
+    """
+    Returns a mapping of audio paths to text
+    ---
+    :param wavs: string
+                string containing path to audio file,
+    :param maxlen: int
+                max length of word
+    :return data: list of dictionaries
+                each dictionary contain "audio" and "text", corresponding to the audio path and its text
+            removed_files: list of files that were excluded from data
+    """
+    data = []
+    removed_files = []
+    pattern = re.compile(r"\[.*\]")
+    for wav in wavs:
+        description = wav.split("/")
+        session = description[5]
+        id = description[-1].split('.')[0]
+        speaker = description[4]
+        # print(description)
+        # print(id)
+        try:
+            filename = glob(f"./datasets/TORGO/Control/{speaker}/{session}/prompts/{id}.txt")[0]
+        except IndexError:
+            continue
+        with open(filename, encoding="utf-8") as f:
+            line = f.readline()
+            line = line.replace("\n", "")
+            if len(line) > maxlen:
+                continue
+            line = pattern.sub("", line)
+            if line == "" or line == "xxx" or '.jpg' in line:
+                removed_files.append({'file': filename, 'text': line})
+                continue
+            line = line.rstrip()
+            data.append({"audio": wav, "text": line})
+            random.shuffle(data)
+    return data, removed_files
+
+def get_dataset_TORGO(speakers):
+    wavs = []
+    for speaker in speakers:
+        wavs += get_audio_path(speaker)
+
+    data, _ = get_data_TORGO(wavs)
+    return data
 
 def get_data(wavs, id_to_text, maxlen=50):
     """returns mapping of audio paths and transcription texts"""
@@ -336,8 +399,10 @@ class VectorizeChar:
         return self.vocab
 
 
+SPEAKERS = ["FC01", "FC02", "FC03", "MC01", "MC02", "MC03", "MC04"]
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data = get_data(wavs, id_to_text, max_target_len)
+data = get_dataset_TORGO(SPEAKERS)
+# data = get_data(wavs, id_to_text, max_target_len)
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
@@ -414,7 +479,8 @@ class DisplayOutputs(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         # if epoch % 5 != 0:
-        #     return
+        #
+        score = 0
         source = self.batch["source"]
         target = self.batch["target"].numpy()
         bs = tf.shape(source)[0]
@@ -429,7 +495,11 @@ class DisplayOutputs(keras.callbacks.Callback):
                     break
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
+            target_text = target_text.replace("-","")
+            if target_text == prediction :
+                score += 1
 
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
         tf.keras.callbacks.ModelCheckpoint(filepath=saveto,
                                            save_weights_only=True,
                                            verbose=1)
