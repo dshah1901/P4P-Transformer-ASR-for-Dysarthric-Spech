@@ -26,6 +26,8 @@ as proposed in the paper, "Attention is All You Need".
 """
 
 
+from enum import unique
+# from multiprocessing.reduction import duplicate
 import os
 import random
 from glob import glob
@@ -310,7 +312,7 @@ def get_audio_path(speaker):
     :return: list of strings
                 the strings represent file paths.
     """
-    print(glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker)))
+    #print(glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker)))
     return glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker))
 
 def get_data_TORGO(wavs,maxlen=5000):
@@ -325,6 +327,7 @@ def get_data_TORGO(wavs,maxlen=5000):
                 each dictionary contain "audio" and "text", corresponding to the audio path and its text
             removed_files: list of files that were excluded from data
     """
+    unique_words = []
     data = []
     removed_files = []
     pattern = re.compile(r"\[.*\]")
@@ -399,13 +402,30 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS = ["FC01", "FC02", "FC03", "MC01", "MC02", "MC03", "MC04"]
+SPEAKERS_TRAIN = ["FC01", "FC02", "MC01", "MC02", "MC03"]
+SPEAKERS_TEST = ["FC03", "MCO4"]
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data = get_dataset_TORGO(SPEAKERS)
+data_train = get_dataset_TORGO(SPEAKERS_TRAIN)
+data_test = get_dataset_TORGO(SPEAKERS_TEST)
 # data = get_data(wavs, id_to_text, max_target_len)
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
+def remove_unique_words(data):
+    texts = [_["text"] for _ in data]
+    duplicate_words = [number for number in texts if texts.count(number) > 1]
+    unique_duplicates = list(set(duplicate_words))
+
+    print(unique_duplicates)
+    # for x in texts:
+    #     if x not in unique_list:
+    #         unique_list.append(x)
+    
+    # for x in unique_list:
+    #     print(x)
+
+
+    return 0
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
@@ -449,10 +469,9 @@ def create_tf_dataset(data, bs=4):
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-
-split = int(len(data) * 0.99)
-train_data = data[:split]
-test_data = data[split:]
+remove_unique_words(data_train)
+train_data = data_train
+test_data = data_test
 ds = create_tf_dataset(train_data, bs=64)
 val_ds = create_tf_dataset(test_data, bs=4)
 
@@ -463,7 +482,7 @@ val_ds = create_tf_dataset(test_data, bs=4)
 
 class DisplayOutputs(keras.callbacks.Callback):
     def __init__(
-        self, batch, idx_to_token, target_start_token_idx=27, target_end_token_idx=28
+        self, batch, ds, idx_to_token, target_start_token_idx=27, target_end_token_idx=28
     ):
         """Displays a batch of outputs after every epoch
         Args:
@@ -476,6 +495,7 @@ class DisplayOutputs(keras.callbacks.Callback):
         self.target_start_token_idx = target_start_token_idx
         self.target_end_token_idx = target_end_token_idx
         self.idx_to_char = idx_to_token
+        self.val_ds = val_ds
 
     def on_epoch_end(self, epoch, logs=None):
         # if epoch % 5 != 0:
@@ -503,6 +523,23 @@ class DisplayOutputs(keras.callbacks.Callback):
         tf.keras.callbacks.ModelCheckpoint(filepath=saveto,
                                            save_weights_only=True,
                                            verbose=1)
+        return score, bs
+
+    def on_train_end(self, logs=None):
+        """Get the accuracy score from a dataset. The possible metrics are: BLEU score and Word Error Rate"""
+        print("In accuracy function")
+        score = 0
+        samples = 0
+        ds_itr = iter(self.val_ds)
+
+        for self.batch in ds_itr:
+            score_per_batch, bs = self.on_epoch_end(self)
+            score += score_per_batch
+            samples += bs
+
+
+        print('Average {} score of ds: {:.2f}\n'.format("WER", 1 - (score / float(samples))))
+        return 1 - (score / float(samples))
 
 
 """
@@ -557,7 +594,7 @@ batch = next(iter(val_ds))
 # The vocabulary to convert predicted indices into characters
 idx_to_char = vectorizer.get_vocabulary()
 display_cb = DisplayOutputs(
-    batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
+    batch, ds, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
 )  # set the arguments as per vocabulary index for '<' and '>'
 
 model = Transformer(
@@ -585,8 +622,7 @@ learning_rate = CustomSchedule(
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mae'],)
 checkpoint_dir = os.path.dirname(saveto)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=5, verbose=1)
-
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100, verbose=1)
 
 
 """
