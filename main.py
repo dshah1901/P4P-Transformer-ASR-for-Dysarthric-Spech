@@ -27,6 +27,8 @@ as proposed in the paper, "Attention is All You Need".
 
 
 from enum import unique
+import math
+from multiprocessing.dummy import Value
 # from multiprocessing.reduction import duplicate
 import os
 import random
@@ -301,8 +303,8 @@ with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
         id = line.strip().split("|")[0]
         text = line.strip().split("|")[1]
         id_to_text[id] = text
-        print(id_to_text[id] + " id_to_text")
-        print(id + " id")
+        # print(id_to_text[id] + " id_to_text")
+        # print(id + " id")
 # ////////////////////////////////////////////////
 def get_audio_path(speaker):
     """
@@ -412,20 +414,23 @@ vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
 def remove_unique_words(data):
+    testing_data = []
     texts = [_["text"] for _ in data]
-    duplicate_words = [number for number in texts if texts.count(number) > 1]
+    duplicate_words = [number for number in texts if texts.count(number) == 1]
     unique_duplicates = list(set(duplicate_words))
 
-    print(unique_duplicates)
-    # for x in texts:
-    #     if x not in unique_list:
-    #         unique_list.append(x)
+    #print(unique_duplicates)
+    for x in unique_duplicates:
+            key = 'text'
+            unique_words = list(filter(lambda student: student.get('text')==x, data))
+            for i in unique_words:
+                testing_data.append({"audio": i['audio'], "text": i['text']})
+                print(i['text'])
+            
     
-    # for x in unique_list:
-    #     print(x)
 
 
-    return 0
+    return testing_data
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
