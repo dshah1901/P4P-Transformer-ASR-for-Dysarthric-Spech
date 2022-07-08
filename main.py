@@ -404,33 +404,34 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS_TRAIN = ["FC01", "FC02", "MC01", "MC02", "MC03"]
-SPEAKERS_TEST = ["FC03", "MCO4"]
+SPEAKERS = ["FC01", "FC02", "FC03", "MC01", "MC02", "MC03", "MCO4"]
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data_train = get_dataset_TORGO(SPEAKERS_TRAIN)
-data_test = get_dataset_TORGO(SPEAKERS_TEST)
+data = get_dataset_TORGO(SPEAKERS)
 # data = get_data(wavs, id_to_text, max_target_len)
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
 def remove_unique_words(data):
+    print(sum(1 for d in data if d))
     testing_data = []
+    count = 0
     texts = [_["text"] for _ in data]
     duplicate_words = [number for number in texts if texts.count(number) == 1]
     unique_duplicates = list(set(duplicate_words))
-
     #print(unique_duplicates)
     for x in unique_duplicates:
-            key = 'text'
-            unique_words = list(filter(lambda student: student.get('text')==x, data))
-            for i in unique_words:
-                testing_data.append({"audio": i['audio'], "text": i['text']})
-                print(i['text'])
+        unique_words = list(filter(lambda student: student.get('text')==x, data))
+        for i in unique_words:
+            testing_data.append({"audio": i['audio'], "text": i['text']})
             
     
+    # res = list(filter(lambda i: i['text'] != 'mole', data))
+    res = [d for d in data if d['text'] not in unique_duplicates]
+    
 
-
-    return testing_data
+    print(sum(1 for d in res if d))
+    print(sum(1 for d in testing_data if d))
+    return res,testing_data
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
@@ -474,9 +475,10 @@ def create_tf_dataset(data, bs=4):
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-remove_unique_words(data_train)
-train_data = data_train
-test_data = data_test
+# split = int(len(data) * 0.99)
+# train_data = data[:split]
+# test_data = data[split:]
+train_data,test_data = remove_unique_words(data)
 ds = create_tf_dataset(train_data, bs=64)
 val_ds = create_tf_dataset(test_data, bs=4)
 
