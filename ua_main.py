@@ -38,6 +38,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import librosa
 import re
+import pandas as pd
 import numpy as np
 
 """
@@ -420,8 +421,8 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS_TRAIN = ["FC01", "FC02", "MC01", "MC02", "MC03"]
-SPEAKERS_TEST = ["FC03", "MCO4"]
+SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CM01', 'CM04', 'CM05', 'CM06', 'CM08', 'CM09']
+SPEAKERS_TEST = ["CM10", "CF02"]
 max_target_len = 50  # all transcripts in out data are < 200 characters
 data_train = get_dataset_UA(SPEAKERS_TRAIN)
 data_test = get_dataset_UA(SPEAKERS_TEST)
