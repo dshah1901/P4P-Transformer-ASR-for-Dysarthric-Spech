@@ -315,7 +315,7 @@ def get_audio_path_UA(speaker):
                 the strings represent file paths.
     """
     #print(glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker)))
-    return glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
+    return glob("./UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
 
 def get_word_list_UA():
 
@@ -341,7 +341,7 @@ def get_data_UA(wavs):
             removed_files: list of files that were excluded from data
     """
     data = []
-
+    removed_files = []
     word_dictionary = get_word_list_UA()
 
     for wav in wavs:
@@ -350,14 +350,13 @@ def get_data_UA(wavs):
         if word_key.startswith('U'):
             # word_key = '_'.join([block, word_key])
             continue
-
         text = word_dictionary.get(word_key, -1)
         if text == -1:
             continue
         elif block == 'B1' or block == 'B2' or block == 'B3':
             data.append({'audio': wav, 'text': text})
 
-    return data
+    return data, removed_files
 
 def get_dataset_UA(speakers):
     """Extracts and split the data into B1, B2 and B3 as dataset objects that can be used for model training
@@ -370,7 +369,7 @@ def get_dataset_UA(speakers):
     for speaker in speakers:
         wavs += get_audio_path_UA(speaker)
 
-    data = get_data_UA(wavs)
+    data, _ = get_data_UA(wavs)
     return data
 
 def get_data(wavs, id_to_text, maxlen=50):
