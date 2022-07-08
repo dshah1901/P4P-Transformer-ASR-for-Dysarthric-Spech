@@ -315,7 +315,7 @@ def get_audio_path_UA(speaker):
                 the strings represent file paths.
     """
     #print(glob("./datasets/TORGO/Control/{}/**/wav_*/*.wav".format(speaker)))
-    return glob("./UASPEECH/audio/**/{}/*.wav".format(speaker), recursive=True)
+    return glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
 
 def get_word_list_UA():
 
@@ -340,9 +340,7 @@ def get_data_UA(wavs):
                 each dictionary contain "audio" and "text", corresponding to the audio path and its text
             removed_files: list of files that were excluded from data
     """
-    data_B1 = []
-    data_B2 = []
-    data_B3 = []
+    data = []
 
     word_dictionary = get_word_list_UA()
 
@@ -356,16 +354,12 @@ def get_data_UA(wavs):
         text = word_dictionary.get(word_key, -1)
         if text == -1:
             continue
-        if block == 'B1':
-            data_B1.append({'audio': wav, 'text': text})
-        elif block == 'B2':
-            data_B2.append({'audio': wav, 'text': text})
-        elif block == 'B3':
-            data_B3.append({'audio': wav, 'text': text})
+        elif block == 'B1' or block == 'B2' or block == 'B3':
+            data.append({'audio': wav, 'text': text})
 
-    return data_B1, data_B2, data_B3
+    return data
 
-def get_dataset_UA(speakers, feature_extractor, vectorizer):
+def get_dataset_UA(speakers):
     """Extracts and split the data into B1, B2 and B3 as dataset objects that can be used for model training
     :param speakers: list of speakers to get data from UASpeech data_set.
     :param feature_extractor: function which extracts features from data
@@ -376,12 +370,8 @@ def get_dataset_UA(speakers, feature_extractor, vectorizer):
     for speaker in speakers:
         wavs += get_audio_path_UA(speaker)
 
-    data_B1, data_B2, data_B3 = get_data_UA(wavs)
-
-    B1 = create_tf_dataset(data_B1, feature_extractor=feature_extractor, vectorizer=vectorizer, bs=64)      # B1 data
-    B2 = create_tf_dataset(data_B2, feature_extractor=feature_extractor, vectorizer=vectorizer, bs=64)     # B2 data
-    B3 = create_tf_dataset(data_B3, feature_extractor=feature_extractor, vectorizer=vectorizer, bs=64)  # B3 data
-    return B1, B2, B3
+    data, _ = get_data_UA(wavs)
+    return data
 
 def get_data(wavs, id_to_text, maxlen=50):
     """returns mapping of audio paths and transcription texts"""
@@ -424,10 +414,11 @@ class VectorizeChar:
 SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CM01', 'CM04', 'CM05', 'CM06', 'CM08', 'CM09']
 SPEAKERS_TEST = ["CM10", "CF02"]
 max_target_len = 50  # all transcripts in out data are < 200 characters
+vectorizer = VectorizeChar(max_target_len)
 data_train = get_dataset_UA(SPEAKERS_TRAIN)
 data_test = get_dataset_UA(SPEAKERS_TEST)
 # data = get_data(wavs, id_to_text, max_target_len)
-vectorizer = VectorizeChar(max_target_len)
+
 print("vocab size", len(vectorizer.get_vocabulary()))
 
 def remove_unique_words(data):
