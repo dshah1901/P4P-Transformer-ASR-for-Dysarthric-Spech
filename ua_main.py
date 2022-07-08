@@ -319,7 +319,7 @@ def get_audio_path_UA(speaker):
 
 def get_word_list_UA():
 
-    word_list_xls = pd.read_excel('./UASPEECH/speaker_wordlist.xlsx', sheet_name="Word_filename", header=0)
+    word_list_xls = pd.read_excel("./UASPEECH/speaker_wordlist.xls", sheet_name="Word_filename", header=0)
     word_dictionary = {}
 
     for i in range(word_list_xls.shape[0]):
@@ -370,7 +370,7 @@ def get_dataset_UA(speakers):
     for speaker in speakers:
         wavs += get_audio_path_UA(speaker)
 
-    data, _ = get_data_UA(wavs)
+    data = get_data_UA(wavs)
     return data
 
 def get_data(wavs, id_to_text, maxlen=50):
