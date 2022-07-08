@@ -298,13 +298,13 @@ saveto = "./datasets/uaspeech"
 wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
 
 id_to_text = {}
-with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
-    for line in f:
-        id = line.strip().split("|")[0]
-        text = line.strip().split("|")[1]
-        id_to_text[id] = text
-        # print(id_to_text[id] + " id_to_text")
-        # print(id + " id")
+# with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
+#     for line in f:
+#         id = line.strip().split("|")[0]
+#         text = line.strip().split("|")[1]
+#         id_to_text[id] = text
+#         # print(id_to_text[id] + " id_to_text")
+#         # print(id + " id")
 # ////////////////////////////////////////////////
 def get_audio_path_UA(speaker):
     """
