@@ -481,7 +481,7 @@ remove_unique_words(data_train)
 train_data = data_train
 test_data = data_test
 ds = create_tf_dataset(train_data, bs=64)
-val_ds = create_tf_dataset(test_data, bs=4)
+val_ds = create_tf_dataset(test_data, bs=1)
 
 """
 ## Callbacks to display predictions

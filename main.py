@@ -480,7 +480,7 @@ def create_tf_dataset(data, bs=4):
 # test_data = data[split:]
 train_data,test_data = remove_unique_words(data)
 ds = create_tf_dataset(train_data, bs=64)
-val_ds = create_tf_dataset(test_data, bs=4)
+val_ds = create_tf_dataset(test_data, bs=1)
 
 """
 ## Callbacks to display predictions
@@ -522,11 +522,11 @@ class DisplayOutputs(keras.callbacks.Callback):
                     break
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
-            target_text = target_text.replace("-","")
-            if target_text == prediction :
+            if target_text.replace('-','') == prediction :
                 score += 1
 
-            print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
+        print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
+        print(float(bs))
         tf.keras.callbacks.ModelCheckpoint(filepath=saveto,
                                            save_weights_only=True,
                                            verbose=1)
