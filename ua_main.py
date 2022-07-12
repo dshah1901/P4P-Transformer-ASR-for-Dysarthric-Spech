@@ -340,8 +340,7 @@ def get_data_UA(wavs):
                 each dictionary contain "audio" and "text", corresponding to the audio path and its text
             removed_files: list of files that were excluded from data
     """
-    data_train = []
-    data_test = []
+    data = []
     removed_files = []
     word_dictionary = get_word_list_UA()
 
@@ -354,13 +353,11 @@ def get_data_UA(wavs):
         text = word_dictionary.get(word_key, -1)
         if text == -1:
             continue
-        elif block == 'B1' or block == 'B2':
-            data_train.append({'audio': wav, 'text': text})
-        elif  block == 'B3' : 
-            data_test.append({'audio': wav, 'text': text})
+        elif block == 'B1' or block == 'B2' or block == 'B3':
+            data.append({'audio': wav, 'text': text})
 
 
-    return data_train, data_test, removed_files
+    return data, removed_files
 
 def get_dataset_UA(speakers):
     """Extracts and split the data into B1, B2 and B3 as dataset objects that can be used for model training
@@ -373,9 +370,9 @@ def get_dataset_UA(speakers):
     for speaker in speakers:
         wavs += get_audio_path_UA(speaker)
 
-    data_train, data_test, _ = get_data_UA(wavs)
+    data, _ = get_data_UA(wavs)
 
-    return data_train, data_test
+    return data
 
 def get_data(wavs, id_to_text, maxlen=50):
     """returns mapping of audio paths and transcription texts"""
@@ -415,10 +412,12 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM06', 'CM08', 'CM09', 'CM10']
+SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+SPEAKERS_TEST = ['CM06']
 max_target_len = 50  # all transcripts in out data are < 200 characters
 vectorizer = VectorizeChar(max_target_len)
-data_train, data_test = get_dataset_UA(SPEAKERS)
+data_train = get_dataset_UA(SPEAKERS_TRAIN)
+data_test = get_dataset_UA(SPEAKERS_TEST)
 
 # data = get_data(wavs, id_to_text, max_target_len)
 
