@@ -522,11 +522,11 @@ class DisplayOutputs(keras.callbacks.Callback):
                     break
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
-            if target_text.replace('-','') == prediction :
+            target_text = target_text.replace("-","")
+            if target_text == prediction :
                 score += 1
 
-        print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
-        print(float(bs))
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
         tf.keras.callbacks.ModelCheckpoint(filepath=saveto,
                                            save_weights_only=True,
                                            verbose=1)

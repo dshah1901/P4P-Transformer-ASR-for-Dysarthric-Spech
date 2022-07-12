@@ -314,12 +314,12 @@ def get_audio_path_UA(speaker):
     :return: list of strings
                 the strings represent file paths.
     """
-    print(glob("./UASPEECH/audio/control/{}/*.wav".format(speaker)))
-    return glob("./UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
+    print(glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker)))
+    return glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
 
 def get_word_list_UA():
 
-    word_list_xls = pd.read_excel("./UASPEECH/speaker_wordlist.xls", sheet_name="Word_filename", header=0)
+    word_list_xls = pd.read_excel("./datasets/UASPEECH/speaker_wordlist.xls", sheet_name="Word_filename", header=0)
     word_dictionary = {}
 
     for i in range(word_list_xls.shape[0]):
@@ -340,7 +340,8 @@ def get_data_UA(wavs):
                 each dictionary contain "audio" and "text", corresponding to the audio path and its text
             removed_files: list of files that were excluded from data
     """
-    data = []
+    data_train = []
+    data_test = []
     removed_files = []
     word_dictionary = get_word_list_UA()
 
@@ -353,10 +354,13 @@ def get_data_UA(wavs):
         text = word_dictionary.get(word_key, -1)
         if text == -1:
             continue
-        elif block == 'B1' or block == 'B2' or block == 'B3':
-            data.append({'audio': wav, 'text': text})
+        elif block == 'B1' or block == 'B2':
+            data_train.append({'audio': wav, 'text': text})
+        elif  block == 'B3' : 
+            data_test.append({'audio': wav, 'text': text})
 
-    return data, removed_files
+
+    return data_train, data_test, removed_files
 
 def get_dataset_UA(speakers):
     """Extracts and split the data into B1, B2 and B3 as dataset objects that can be used for model training
@@ -369,8 +373,9 @@ def get_dataset_UA(speakers):
     for speaker in speakers:
         wavs += get_audio_path_UA(speaker)
 
-    data, _ = get_data_UA(wavs)
-    return data
+    data_train, data_test, _ = get_data_UA(wavs)
+
+    return data_train, data_test
 
 def get_data(wavs, id_to_text, maxlen=50):
     """returns mapping of audio paths and transcription texts"""
@@ -410,12 +415,11 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CM01', 'CM04', 'CM05', 'CM06', 'CM08', 'CM09']
-SPEAKERS_TEST = ["CM10", "CF02"]
+SPEAKERS = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM06', 'CM08', 'CM09', 'CM10']
 max_target_len = 50  # all transcripts in out data are < 200 characters
 vectorizer = VectorizeChar(max_target_len)
-data_train = get_dataset_UA(SPEAKERS_TRAIN)
-data_test = get_dataset_UA(SPEAKERS_TEST)
+data_train, data_test = get_dataset_UA(SPEAKERS)
+
 # data = get_data(wavs, id_to_text, max_target_len)
 
 print("vocab size", len(vectorizer.get_vocabulary()))
@@ -477,9 +481,11 @@ def create_tf_dataset(data, bs=4):
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-remove_unique_words(data_train)
+
 train_data = data_train
+print(sum(1 for d in train_data if d))
 test_data = data_test
+print(sum(1 for d in test_data if d))
 ds = create_tf_dataset(train_data, bs=64)
 val_ds = create_tf_dataset(test_data, bs=1)
 
