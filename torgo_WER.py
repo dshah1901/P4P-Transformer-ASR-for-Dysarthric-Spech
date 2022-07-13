@@ -39,6 +39,8 @@ from tensorflow.keras import layers
 import librosa
 import re
 import numpy as np
+from jiwer import wer
+import pandas as pd
 
 """
 ## Define the Transformer Input Layer
@@ -433,55 +435,6 @@ def remove_unique_words(data):
     print(sum(1 for d in res if d))
     print(sum(1 for d in testing_data if d))
     return res,testing_data
-def wer(r, h):
-    """
-    Calculation of WER with Levenshtein distance.
-
-    Works only for iterables up to 254 elements (uint8).
-    O(nm) time ans space complexity.
-
-    Parameters
-    ----------
-    r : list
-    h : list
-
-    Returns
-    -------
-    int
-
-    Examples
-    --------
-    >>> wer("who is there".split(), "is there".split())
-    1
-    >>> wer("who is there".split(), "".split())
-    3
-    >>> wer("".split(), "who is there".split())
-    3
-    """
-    # initialisation
-
-
-    d = np.zeros((len(r) + 1) * (len(h) + 1), dtype=np.uint8)
-    d = d.reshape((len(r) + 1, len(h) + 1))
-    for i in range(len(r) + 1):
-        for j in range(len(h) + 1):
-            if i == 0:
-                d[0][j] = j
-            elif j == 0:
-                d[i][0] = i
-
-    # computation
-    for i in range(1, len(r) + 1):
-        for j in range(1, len(h) + 1):
-            if r[i - 1] == h[j - 1]:
-                d[i][j] = d[i - 1][j - 1]
-            else:
-                substitution = d[i - 1][j - 1] + 1
-                insertion = d[i][j - 1] + 1
-                deletion = d[i - 1][j] + 1
-                d[i][j] = min(substitution, insertion, deletion)
-
-    return d[len(r)][len(h)]
 
 
 def create_text_ds(data):
@@ -558,7 +511,6 @@ class DisplayOutputs(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         # if epoch % 5 != 0:
         #
-        WER =0
         score = 0
         source = self.batch["source"]
         target = self.batch["target"].numpy()
@@ -575,33 +527,37 @@ class DisplayOutputs(keras.callbacks.Callback):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            WER += wer(target_text.split(), prediction.split())
-            print(WER)
+            error = wer(prediction, target_text)
             if target_text == prediction :
                 score += 1
 
-            print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
-        tf.keras.callbacks.ModelCheckpoint(filepath=savetomodel,
-                                           save_weights_only=True,
-                                           verbose=1)
-        return score, WER, bs
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", error))
+
+        return score, target_text,prediction, bs
 
     def on_train_end(self, logs=None):
         """Get the accuracy score from a dataset. The possible metrics are: BLEU score and Word Error Rate"""
         print("In accuracy function")
         score = 0
         samples = 0
-        werr = 0 
+        target = []
+        word_error_rate = []
+        prediction = []
+        
         ds_itr = iter(self.val_ds)
 
         for self.batch in ds_itr:
-            score_per_batch, wer_per_batch, bs = self.on_epoch_end(self)
+            score_per_batch, target_per_batch, prediction_per_batch, bs = self.on_epoch_end(self)
             score += score_per_batch
-            werr += wer_per_batch
+            target.append(target_per_batch)
+            prediction.append(prediction_per_batch)
+            error = wer(target_per_batch,prediction_per_batch)
+            word_error_rate.append(error)
             samples += bs
 
-
-        print('Average {} score of ds: {:.2f}\n'.format("WER", (werr / float(samples))))
+        data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
+        data.to_excel('ASR Results.xlsx', sheet_name='Sheet2',index=False)
+        print('Average {} score of ds: {:.2f}\n'.format("WER", error))
         return 1 - (score / float(samples))
 
 

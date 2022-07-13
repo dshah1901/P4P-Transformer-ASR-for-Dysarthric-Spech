@@ -25,6 +25,16 @@ def wer(r, h):
     >>> wer("".split(), "who is there".split())
     3
     """
+
+    from jiwer import wer
+
+    ground_truth = "an official deadline cannot be postponed"
+    hypothesis = "an resulwa y oast of ndeolour t the asiagr"
+
+    error = wer(ground_truth, hypothesis)
+
+
+    print(error)
     # initialisation
     import numpy
 
@@ -52,7 +62,7 @@ def wer(r, h):
 
 
 if __name__ == "__main__":
-    print(wer("who is there".split(), "".split()))
+    print(wer("an official deadline cannot be postponed".split(), "an resulwa y oast of ndeolour t the asiagr".split()))
     import doctest
 
     doctest.testmod()
