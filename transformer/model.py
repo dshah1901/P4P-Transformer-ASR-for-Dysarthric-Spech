@@ -276,7 +276,8 @@ def create_text_ds(data):
 def path_to_audio(path):
     # spectrogram using stft
     audio = tf.io.read_file(path)
-    audio, _ = tf.audio.decode_wav(audio, 1)
+    #audio, _ = tf.audio.decode_wav(audio, 1)
+    audio, _ = tfio.audio.decode_flac(audio, 1) #double check
     audio = tf.squeeze(audio, axis=-1)
     stfts = tf.signal.stft(audio, frame_length=200, frame_step=80, fft_length=256)
     x = tf.math.pow(tf.abs(stfts), 0.5)
@@ -295,7 +296,7 @@ def path_to_audio(path):
 def create_audio_ds(data):
     flist = [_["audio"] for _ in data]
     audio_ds = tf.data.Dataset.from_tensor_slices(flist)
-    audio_ds = audio_ds.map(path_to_audio, num_parallel_calls=tf.data.AUTOTUNE)
+    audio_ds = audio_ds.map(path_to_audio, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     return audio_ds
 
 
