@@ -41,6 +41,6 @@ def get_data_libre():
                 word_list.append(word)
             full_sen = " ".join(word_list)
             libri_test_data.append({"audio": flac, "text": full_sen})
-    return libre_test, libre_train
+    return libri_test_data, libri_train_data
 
 

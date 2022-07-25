@@ -1,41 +1,4 @@
-
-
 def wer(r, h):
-    """
-    Calculation of WER with Levenshtein distance.
-
-    Works only for iterables up to 254 elements (uint8).
-    O(nm) time ans space complexity.
-
-    Parameters
-    ----------
-    r : list
-    h : list
-
-    Returns
-    -------
-    int
-
-    Examples
-    --------
-    >>> wer("who is there".split(), "is there".split())
-    1
-    >>> wer("who is there".split(), "".split())
-    3
-    >>> wer("".split(), "who is there".split())
-    3
-    """
-
-    from jiwer import wer
-
-    ground_truth = "an official deadline cannot be postponed"
-    hypothesis = "an resulwa y oast of ndeolour t the asiagr"
-
-    error = wer(ground_truth, hypothesis)
-
-
-    print(error)
-    # initialisation
     import numpy
 
     d = numpy.zeros((len(r) + 1) * (len(h) + 1), dtype=numpy.uint8)
@@ -66,3 +29,4 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
+

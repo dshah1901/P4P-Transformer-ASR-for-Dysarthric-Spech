@@ -10,45 +10,10 @@ import keras.callbacks
 import keras_tuner as kt 
 from preprocessing.libre_speech import *
 from transformer.model import *
+from train import *
+import pandas as pd
 
-#LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
-max_target_len = 50  # all transcripts in out data are < 200 characters
-data_train, data_test = get_data_libre();
-vectorizer = VectorizeChar(max_target_len)
-indexes = []
-audio_ds = create_audio_ds(data_train)  #libre_train 
-for index,val in enumerate(list(audio_ds)):
-    df = pd.DataFrame(val)   
-    if(df.isnull().sum().sum() > 0):
-        indexes.append(index)
-
-indexes = sorted(indexes, reverse=True)
-# Traverse the indices list
-for index in indexes:
-    if index < len(data_train):
-        data_train.pop(index)
-
-#data_test
-test_index = []
-audio_dss = create_audio_ds(data_test)   #libre_test
-for indexx,vall in enumerate(list(audio_dss)):
-    df = pd.DataFrame(vall)   
-    if(df.isnull().sum().sum() > 0):
-        test_index.append(indexx)
-
-test_index = sorted(test_index, reverse=True)
-# Traverse the indices list
-for index in test_index:
-    if index < len(data_test):
-        data_test.pop(index)
-
-print("training data size after porcess")
-print(sum(1 for d in data_train if d)) 
-print("testing data size after porcess")
-print(sum(1 for d in data_test if d)) 
-
-train_data = data_train
-test_data = data_test
+test_data, train_data = train_test_libre()
 ds = create_tf_dataset(train_data, bs=64)
 val_ds = create_tf_dataset(test_data, bs=1)
 
