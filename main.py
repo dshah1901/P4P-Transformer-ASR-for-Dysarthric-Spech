@@ -11,6 +11,9 @@ from tensorflow.keras import layers
 import librosa
 import re
 import numpy as np
+from preprocessing.torgo import *
+from transformer.model import *
+from accuracy.WRA import *
 
 
 SPEAKERS = ["FC01", "FC02", "FC03", "MC01", "MC02", "MC03", "MCO4"]
@@ -63,5 +66,4 @@ learning_rate = CustomSchedule(
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mae'],)
-checkpoint_dir = os.path.dirname(saveto)
 history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100, verbose=1)

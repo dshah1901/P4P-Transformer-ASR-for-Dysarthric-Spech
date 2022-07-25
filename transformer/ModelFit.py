@@ -8,7 +8,7 @@ max_target_len = 50  # all transcripts in out data are < 200 characters
 data_train, data_test = get_dataset(LABELS)
 vectorizer = VectorizeChar(max_target_len)
 indexes = []
-audio_ds = create_audio_ds(data_train)   
+audio_ds = create_audio_ds(data_train)  #libre_train 
 for index,val in enumerate(list(audio_ds)):
     df = pd.DataFrame(val)   
     if(df.isnull().sum().sum() > 0):
@@ -22,7 +22,7 @@ for index in indexes:
 
 #data_test
 test_index = []
-audio_dss = create_audio_ds(data_test)   
+audio_dss = create_audio_ds(data_test)   #libre_test
 for indexx,vall in enumerate(list(audio_dss)):
     df = pd.DataFrame(vall)   
     if(df.isnull().sum().sum() > 0):
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     tuner = kt.BayesianOptimization(
                 model_builder,
                 objective="val_loss",
-                max_trials=10,
+                max_trials=10, # amount to trials to find best params
                 directory='./datasets',
                 project_name='_Bayesian_hyperparam_UA',
                 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
-    tuner.search(ds, validation_data=val_ds, epochs=20, callbacks=[stop_early])
+    tuner.search(ds, validation_data=val_ds, epochs=20, callbacks=[stop_early]) # can change the number of epoches here
 
 
     # Get the optimal hyperparameters
