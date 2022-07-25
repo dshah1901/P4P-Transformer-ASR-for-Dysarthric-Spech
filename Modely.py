@@ -1,3 +1,4 @@
+
 """
 Title: Automatic Speech Recognition with Transformer
 Author: [Apoorv Nandan](https://twitter.com/NandanApoorv)
@@ -5,8 +6,6 @@ Date created: 2021/01/13
 Last modified: 2021/01/13
 Description: Training a sequence-to-sequence Transformer for automatic speech recognition.
 """
-
-
 """
 ## Introduction
 Automatic speech recognition (ASR) consists of transcribing audio speech segments into text.
@@ -26,22 +25,22 @@ as proposed in the paper, "Attention is All You Need".
 """
 
 
-from enum import unique
-import math
-from multiprocessing.dummy import Value
-# from multiprocessing.reduction import duplicate
 import os
 import random
 from glob import glob
+from tkinter import Label
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-import librosa
 import re
-import pandas as pd
+import tensorflow_io as tfio
 import numpy as np
-
-
+import pandas as pd
+import wave
+from scipy.io import wavfile
+import contextlib
+import librosa 
+import soundfile as sf
 """
 ## Define the Transformer Input Layer
 When processing past target tokens for the decoder, we compute the sum of
@@ -98,7 +97,6 @@ class TransformerEncoder(layers.Layer):
             [
                 layers.Dense(feed_forward_dim, activation="relu"),
                 layers.Dense(embed_dim),
-                
             ]
         )
         self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
@@ -196,8 +194,8 @@ class Transformer(keras.Model):
         self.num_layers_dec = num_layers_dec
         self.target_maxlen = target_maxlen
         self.num_classes = num_classes
-        self.model_name = 'UA_Speech_Transformer_bay'
-
+        self.model_name = 'Base_model_hypertune'
+        
         self.enc_input = SpeechFeatureEmbedding(num_hid=num_hid, maxlen=source_maxlen)
         self.dec_input = TokenEmbedding(
             num_vocab=num_classes, maxlen=target_maxlen, num_hid=num_hid
@@ -288,105 +286,52 @@ Note: This requires ~3.6 GB of disk space and
 takes ~5 minutes for the extraction of files.
 """
 
-# keras.utils.get_file(
-#     os.path.join(os.getcwd(), "data.tar.gz"),
-#     "https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2",
-#     extract=True,
-#     archive_format="tar",
-#     cache_dir=".",
-# )
+def get_audio_path(labels):
+    return glob("./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/{}/*.wav".format(labels), recursive=True)
 
-# can remove this
-saveto = "./datasets/uaspeech"
-wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
+def get_dataset(labels):
+    data =[]
+    wavs = []
+    durations =[]
+    testing_data =[]
+    testing = []
+    validation_list = open("./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/testing_list.txt")
+    validation_files = validation_list.read().splitlines()
+    for name in validation_files:
+        description = name.split("/")
+        full_sen = "./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/" + name
+        sample_rate, audio = wavfile.read(full_sen)
+        with contextlib.closing(wave.open(full_sen,'r')) as wavfiless:
+            frames = wavfiless.getnframes()
+            rate = wavfiless.getframerate()
+            duration = frames / float(rate)
+            if (sample_rate == 16000 and duration >= 1.0):
+                testing_data.append(full_sen)
+                testing.append({"audio": full_sen, "text": description[0]})
 
-id_to_text = {}
-# with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
-#     for line in f:
-#         id = line.strip().split("|")[0]
-#         text = line.strip().split("|")[1]
-#         id_to_text[id] = text
-#         # print(id_to_text[id] + " id_to_text")
-#         # print(id + " id")
-# ////////////////////////////////////////////////
-def get_audio_path_UA(speaker):
-    """
-    Returns path to audio files belonging to specified speaker
-    :param speaker: string
-                       string encoding the speaker
-    :return: list of strings
-                the strings represent file paths.
-    """
-    print(glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker)))
-    return glob("./datasets/UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
-
-def get_word_list_UA():
-
-    word_list_xls = pd.read_excel("./datasets/UASPEECH/speaker_wordlist.xls", sheet_name="Word_filename", header=0)
-    word_dictionary = {}
-
-    for i in range(word_list_xls.shape[0]):
-        value = word_list_xls.iloc[i].values
-        word_dictionary[value[1]] = value[0]
-
-    return word_dictionary
-
-def get_data_UA(wavs):
-    """
-    Returns a mapping of audio paths to text
-    ---
-    :param wavs: string
-                string containing path to audio file,
-    :param maxlen: int
-                max length of word
-    :return data: list of dictionaries
-                each dictionary contain "audio" and "text", corresponding to the audio path and its text
-            removed_files: list of files that were excluded from data
-    """
-    data = []
-    removed_files = []
-    word_dictionary = get_word_list_UA()
+    for speaker in labels:
+        wavs += get_audio_path(speaker)
 
     for wav in wavs:
-        speaker, block, word_key, mic = wav.split('_')
-        # use only the 155 words shared by all speakers
-        if word_key.startswith('U'):
-            # word_key = '_'.join([block, word_key])
-            continue
-        text = word_dictionary.get(word_key, -1)
-        if text == -1:
-            continue
-        elif block == 'B1' or block == 'B2' or block == 'B3':
-            data.append({'audio': wav, 'text': text})
+            description = wav.split("/")
+            label = description[4] 
+            sample_rate, audio = wavfile.read(wav)
+            with contextlib.closing(wave.open(wav,'r')) as wavfiles:
+                frame = wavfiles.getnframes()
+                rate = wavfiles.getframerate()
+                duration = frame/float(rate)
+            if (sample_rate == 16000 and duration >= 1.0):
+                data.append({"audio": wav, "text": label})
+    
+    res = [d for d in data if d['audio'] not in testing_data]
 
-
-    return data, removed_files
-
-def get_dataset_UA(speakers):
-    """Extracts and split the data into B1, B2 and B3 as dataset objects that can be used for model training
-    :param speakers: list of speakers to get data from UASpeech data_set.
-    :param feature_extractor: function which extracts features from data
-    :param vectorizer: text vectorizer
-    :return: dataset objects for model fitting
-    """
-    wavs = []
-    for speaker in speakers:
-        wavs += get_audio_path_UA(speaker)
-
-    data, _ = get_data_UA(wavs)
-
-    return data
-
-def get_data(wavs, id_to_text, maxlen=50):
-    """returns mapping of audio paths and transcription texts"""
-    data = []
-    for w in wavs:
-        id = w.split("/")[-1].split(".")[0]
-        if len(id_to_text[id]) < maxlen:
-            data.append({"audio": w, "text": id_to_text[id]})
-    return data
-
-
+    print(sum(1 for d in res if d)) #training data
+    print("testing data size")
+    print(sum(1 for d in testing if d)) #All Data
+    return res,testing
+#LABELS = ['bed']
+LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
+#LABELS = ['bed','bird','cat','dog','down','eight','five','four','go','happy','house','left','marvin','nine','no','off','on','one','right','seven','sheila','six','stop','three','tree','two','up','wow','yes','zero']
 """
 ## Preprocess the dataset
 """
@@ -415,37 +360,16 @@ class VectorizeChar:
         return self.vocab
 
 
-SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
-SPEAKERS_TEST = ['CM06']
 max_target_len = 50  # all transcripts in out data are < 200 characters
+data_train, data_test = get_dataset(LABELS)
 vectorizer = VectorizeChar(max_target_len)
-data_train = get_dataset_UA(SPEAKERS_TRAIN)
-data_test = get_dataset_UA(SPEAKERS_TEST)
+# print("vocab size", len(vectorizer.get_vocabulary()))
 
-# data = get_data(wavs, id_to_text, max_target_len)
-
-print("vocab size", len(vectorizer.get_vocabulary()))
-
-def remove_unique_words(data):
-    testing_data = []
-    texts = [_["text"] for _ in data]
-    duplicate_words = [number for number in texts if texts.count(number) == 1]
-    unique_duplicates = list(set(duplicate_words))
-
-    #print(unique_duplicates)
-    for x in unique_duplicates:
-            key = 'text'
-            unique_words = list(filter(lambda student: student.get('text')==x, data))
-            for i in unique_words:
-                testing_data.append({"audio": i['audio'], "text": i['text']})
-                print(i['text'])
-    return testing_data
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
     text_ds = [vectorizer(t) for t in texts]
     text_ds = tf.data.Dataset.from_tensor_slices(text_ds)
-    print(text_ds)
     return text_ds
 
 
@@ -465,6 +389,7 @@ def path_to_audio(path):
     pad_len = 2754
     paddings = tf.constant([[0, pad_len], [0, 0]])
     x = tf.pad(x, paddings, "CONSTANT")[:pad_len, :]
+    # tf.print(x)
     return x
 
 
@@ -473,6 +398,7 @@ def create_audio_ds(data):
     audio_ds = tf.data.Dataset.from_tensor_slices(flist)
     audio_ds = audio_ds.map(path_to_audio, num_parallel_calls=tf.data.AUTOTUNE)
     return audio_ds
+
 
 
 def create_tf_dataset(data, bs=4):
@@ -485,12 +411,45 @@ def create_tf_dataset(data, bs=4):
     return ds
 
 
-train_data = data_train
-print(sum(1 for d in train_data if d))
-test_data = data_test
-print(sum(1 for d in test_data if d))
-ds = create_tf_dataset(train_data, bs=64)
-val_ds = create_tf_dataset(test_data, bs=1)
+indexes = []
+audio_ds = create_audio_ds(data_train)   
+for index,val in enumerate(list(audio_ds)):
+    df = pd.DataFrame(val)   
+    if(df.isnull().sum().sum() > 0):
+        indexes.append(index)
+
+indexes = sorted(indexes, reverse=True)
+# Traverse the indices list
+for index in indexes:
+    if index < len(data_train):
+        data_train.pop(index)
+
+#data_test
+test_index = []
+audio_dss = create_audio_ds(data_test)   
+for indexx,vall in enumerate(list(audio_dss)):
+    df = pd.DataFrame(vall)   
+    if(df.isnull().sum().sum() > 0):
+        test_index.append(indexx)
+
+test_index = sorted(test_index, reverse=True)
+# Traverse the indices list
+for index in test_index:
+    if index < len(data_test):
+        data_test.pop(index)
+
+print("training data size after porcess")
+print(sum(1 for d in data_train if d)) 
+print("testing data size after porcess")
+print(sum(1 for d in data_test if d)) 
+
+random.shuffle(data_train)
+random.shuffle(data_test)
+
+
+ds = create_tf_dataset(data_train, bs=64)
+val_ds = create_tf_dataset(data_test, bs=1)
+
 
 """
 ## Callbacks to display predictions
@@ -499,7 +458,7 @@ val_ds = create_tf_dataset(test_data, bs=1)
 
 class DisplayOutputs(keras.callbacks.Callback):
     def __init__(
-        self, batch, ds, idx_to_token, target_start_token_idx=27, target_end_token_idx=28
+        self, batch, idx_to_token, target_start_token_idx=27, target_end_token_idx=28
     ):
         """Displays a batch of outputs after every epoch
         Args:
@@ -565,6 +524,7 @@ class DisplayOutputs(keras.callbacks.Callback):
         return 1 - (score / float(samples))
 
 
+
 """
 ## Learning rate schedule
 """
@@ -574,7 +534,7 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
         self,
         init_lr=0.00001,
-        lr_after_warmup=0.001,
+        lr_after_warmup=0.001, #Change learning rate of entire model
         final_lr=0.00001,
         warmup_epochs=15,
         decay_epochs=85,
@@ -587,7 +547,6 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
         self.warmup_epochs = warmup_epochs
         self.decay_epochs = decay_epochs
         self.steps_per_epoch = steps_per_epoch
-        
 
     def calculate_lr(self, epoch):
         """linear warm up - linear decay"""
@@ -618,16 +577,16 @@ batch = next(iter(val_ds))
 # The vocabulary to convert predicted indices into characters
 idx_to_char = vectorizer.get_vocabulary()
 display_cb = DisplayOutputs(
-    batch, ds, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
+    batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
 )  # set the arguments as per vocabulary index for '<' and '>'
 
 model = Transformer(
-    num_hid=384,
-    num_head=4,
-    num_feed_forward=448,
+    num_hid=200,
+    num_head=2,
+    num_feed_forward=400,
     target_maxlen=max_target_len,
-    num_layers_enc=2,
-    num_layers_dec=4,
+    num_layers_enc=4,
+    num_layers_dec=1,
     num_classes=34,
 )
 loss_fn = tf.keras.losses.CategoricalCrossentropy(
@@ -644,10 +603,8 @@ learning_rate = CustomSchedule(
     steps_per_epoch=len(ds),
 )
 optimizer = keras.optimizers.Adam(learning_rate)
-model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mae'],)
-checkpoint_dir = os.path.dirname(saveto)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100, verbose=1)
-
+model.compile(optimizer=optimizer, loss=loss_fn, metrics=['mae'])
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=11)
 
 """
 In practice, you should train for around 100 epochs or more.
