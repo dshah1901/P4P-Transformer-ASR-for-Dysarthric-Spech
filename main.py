@@ -60,8 +60,6 @@ class SpeechFeatureEmbedding(layers.Layer):
 """
 ## Transformer Encoder Layer
 """
-
-
 class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
         super().__init__()
@@ -257,46 +255,56 @@ takes ~5 minutes for the extraction of files.
 def get_audio_path(labels):
     return glob("./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/{}/*.wav".format(labels), recursive=True)
 
-def get_dataset(labels):
-    data =[]
-    wavs = []
-    durations =[]
-    testing_data =[]
-    testing = []
-    validation_list = open("./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/testing_list.txt")
-    validation_files = validation_list.read().splitlines()
-    for name in validation_files:
-        description = name.split("/")
-        full_sen = "./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/" + name
-        sample_rate, audio = wavfile.read(full_sen)
-        with contextlib.closing(wave.open(full_sen,'r')) as wavfiless:
-            frames = wavfiless.getnframes()
-            rate = wavfiless.getframerate()
-            duration = frames / float(rate)
-            if (sample_rate == 16000 and duration >= 1.0):
-                testing_data.append(full_sen)
-                testing.append({"audio": full_sen, "text": description[0]})
+def get_data_libri():
+    libre_train =  glob("./TIMIT (MSVAW)/train/*/*/*.txt", recursive=True)
+    libre_test =  glob("./TIMIT (MSVAW)/test/*/*/*.txt", recursive=True)
 
-    for speaker in labels:
-        wavs += get_audio_path(speaker)
-
-    for wav in wavs:
-            description = wav.split("/")
-            label = description[4] 
-            sample_rate, audio = wavfile.read(wav)
-            with contextlib.closing(wave.open(wav,'r')) as wavfiles:
-                frame = wavfiles.getnframes()
-                rate = wavfiles.getframerate()
-                duration = frame/float(rate)
-            if (sample_rate == 16000 and duration >= 1.0):
-                data.append({"audio": wav, "text": label})
+    libri_data_train = list()
+    for file in libre_train:
+        f = open(file, "r")
+        for line in f:
+            number = line.split()[0]
+            words = line.split()[1:]
+            n_1 = number.split('-')[0]
+            n_2 = number.split('-')[1]
+            wav = './TIMIT (MSVAW)/train/' + n_1 + '/' + n_2 + '/' + number + '.wav'
+            word_list = list()
+            for word in words:
+                word = word.lower()
+                word = re.sub('\'s', '', word)
+                word = re.sub('[^a-zA-Z0-9 \n]', '', word)
+                word_list.append(word)
+            full_sen = " ".join(word_list)
+            libri_data_train.append({"audio": wav, "text": full_sen})
     
-    res = [d for d in data if d['audio'] not in testing_data]
+    libri_data_test = list()
+    for file in libre_test:
+        f = open(file, "r")
+        for line in f:
+            number = line.split()[0]
+            words = line.split()[1:]
+            n_1 = number.split('-')[0]
+            n_2 = number.split('-')[1]
+            wav = './TIMIT (MSVAW)/test/' + n_1 + '/' + n_2 + '/' + number + '.wav'
+            word_list = list()
+            for word in words:
+                word = word.lower()
+                word = re.sub('\'s', '', word)
+                word = re.sub('[^a-zA-Z0-9 \n]', '', word)
+                word_list.append(word)
+            full_sen = " ".join(word_list)
+            libri_data_test.append({"audio": wav, "text": full_sen})
+    
+    return libri_data_train, libri_data_test
 
-    print(sum(1 for d in res if d)) #training data
-    print("testing data size")
-    print(sum(1 for d in testing if d)) #All Data
-    return res,testing
+   
+#     res = [d for d in data if d['audio'] not in testing_data]
+
+#     print(sum(1 for d in res if d)) #training data
+#     print("testing data size")
+#     print(sum(1 for d in testing if d)) #All Data
+#     return res,testing
+
 #LABELS = ['bed']
 LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
 #LABELS = ['bed','bird','cat','dog','down','eight','five','four','go','happy','house','left','marvin','nine','no','off','on','one','right','seven','sheila','six','stop','three','tree','two','up','wow','yes','zero']
@@ -328,7 +336,7 @@ class VectorizeChar:
 
 
 max_target_len = 50  # all transcripts in out data are < 200 characters
-data_train, data_test = get_dataset(LABELS)
+data_train, data_test = get_data_TIMIT()
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
