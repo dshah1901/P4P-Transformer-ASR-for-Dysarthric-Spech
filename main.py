@@ -14,7 +14,7 @@ from scipy.io import wavfile
 import contextlib
 import librosa 
 import soundfile as sf
-
+from wer import *
 
 """
 ## Define the Transformer Input Layer
@@ -252,22 +252,19 @@ class Transformer(keras.Model):
 Note: This requires ~3.6 GB of disk space and
 takes ~5 minutes for the extraction of files.
 """
-def get_audio_path(labels):
-    return glob("./datasets/speech_commands_v0.02.tar/speech_commands_v0.02/{}/*.wav".format(labels), recursive=True)
+def get_data_TIMIT():
+    timit_train =  glob("./TIMIT (MSVAW)/train/*/*/*.txt", recursive=True)
+    timit_test =  glob("./TIMIT (MSVAW)/test/*/*/*.txt", recursive=True)
 
-def get_data_libri():
-    libre_train =  glob("./TIMIT (MSVAW)/train/*/*/*.txt", recursive=True)
-    libre_test =  glob("./TIMIT (MSVAW)/test/*/*/*.txt", recursive=True)
-
-    libri_data_train = list()
-    for file in libre_train:
+    timit_data_train = list()
+    for file in timit_train:
         f = open(file, "r")
         for line in f:
-            number = line.split()[0]
-            words = line.split()[1:]
-            n_1 = number.split('-')[0]
-            n_2 = number.split('-')[1]
-            wav = './TIMIT (MSVAW)/train/' + n_1 + '/' + n_2 + '/' + number + '.wav'
+            words = line.split()[2:]
+            name = file.split(".")[1]
+            print(name)
+            wav = '.' + name + '.wav'
+            print(wav)
             word_list = list()
             for word in words:
                 word = word.lower()
@@ -275,17 +272,17 @@ def get_data_libri():
                 word = re.sub('[^a-zA-Z0-9 \n]', '', word)
                 word_list.append(word)
             full_sen = " ".join(word_list)
-            libri_data_train.append({"audio": wav, "text": full_sen})
+            timit_data_train.append({"audio": wav, "text": full_sen})
     
-    libri_data_test = list()
-    for file in libre_test:
+    timit_data_test = list()
+    for file in timit_test:
         f = open(file, "r")
         for line in f:
-            number = line.split()[0]
-            words = line.split()[1:]
-            n_1 = number.split('-')[0]
-            n_2 = number.split('-')[1]
-            wav = './TIMIT (MSVAW)/test/' + n_1 + '/' + n_2 + '/' + number + '.wav'
+            words = line.split()[2:]
+            name = file.split(".")[1]
+            print(name)
+            wav = '.' + name + '.wav'
+            print(wav)
             word_list = list()
             for word in words:
                 word = word.lower()
@@ -293,9 +290,9 @@ def get_data_libri():
                 word = re.sub('[^a-zA-Z0-9 \n]', '', word)
                 word_list.append(word)
             full_sen = " ".join(word_list)
-            libri_data_test.append({"audio": wav, "text": full_sen})
+            timit_data_test.append({"audio": wav, "text": full_sen})
     
-    return libri_data_train, libri_data_test
+    return timit_data_train, timit_data_test
 
    
 #     res = [d for d in data if d['audio'] not in testing_data]
@@ -306,7 +303,7 @@ def get_data_libri():
 #     return res,testing
 
 #LABELS = ['bed']
-LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
+#LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
 #LABELS = ['bed','bird','cat','dog','down','eight','five','four','go','happy','house','left','marvin','nine','no','off','on','one','right','seven','sheila','six','stop','three','tree','two','up','wow','yes','zero']
 
 """
@@ -335,8 +332,9 @@ class VectorizeChar:
         return self.vocab
 
 
-max_target_len = 50  # all transcripts in out data are < 200 characters
+max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_data_TIMIT()
+vectorizer = VectorizeChar(max_target_len)
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
@@ -415,10 +413,6 @@ print(sum(1 for d in data_train if d))
 print("testing data size after porcess")
 print(sum(1 for d in data_test if d)) 
 
-random.shuffle(data_train)
-random.shuffle(data_test)
-
-
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs=1)
 
@@ -463,12 +457,12 @@ class DisplayOutputs(keras.callbacks.Callback):
                     break
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
-            target_text = target_text.replace("-","")
-            if target_text == prediction :
-                score += 1
+            
+            score = self.model.wer(target_text.split(),prediction.split());
 
-            print('{} score of one validation batch: {:.2f}\n'.format("WER", 1 - score / float(bs)))
+            print('{} score of one validation batch: {:.2f}\n'.format("WER",  score))
             self.model.save_weights(f'./datasets{self.model.model_name}.keras')
+            self.model.save_weights(f'Timit base.h5')
         return score, target_text, prediction, bs
 
     def on_train_end(self, logs=None):
@@ -492,7 +486,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
         data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
-        print('Average {} score of ds: {:.2f}\n'.format("WER", 1 - (score / float(samples))))
+        print('End of train')
         return 1 - (score / float(samples))
 
 
@@ -576,7 +570,22 @@ learning_rate = CustomSchedule(
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=11)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+training_loss = history.history['loss']
+test_loss = history.history['val_loss']
+
+# Create count of the number of epochs
+epoch_count = range(1, len(training_loss) + 1)
+
+# Visualize loss history
+plt.plot(epoch_count, training_loss, 'r--')
+plt.plot(epoch_count, test_loss, 'b-')
+plt.legend(['Training Loss', 'Test Loss'])
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.savefig("training vs loss.png")
+plt.show()
+
 
 """
 In practice, you should train for around 100 epochs or more.
