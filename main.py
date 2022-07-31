@@ -458,7 +458,7 @@ class DisplayOutputs(keras.callbacks.Callback):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             
-            score = self.model.wer(target_text.split(),prediction.split());
+            score = wer(target_text.split(),prediction.split());
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER",  score))
             self.model.save_weights(f'./datasets{self.model.model_name}.keras')
