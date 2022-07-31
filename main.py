@@ -14,6 +14,7 @@ from scipy.io import wavfile
 import contextlib
 import librosa 
 import soundfile as sf
+from matplotlib import pyplot as plt
 from wer import *
 
 """
@@ -291,6 +292,7 @@ def get_data_TIMIT():
                 word_list.append(word)
             full_sen = " ".join(word_list)
             timit_data_test.append({"audio": wav, "text": full_sen})
+            
     
     return timit_data_train, timit_data_test
 
