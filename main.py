@@ -9,6 +9,7 @@ import re
 import numpy
 import pandas as pd
 from matplotlib import pyplot as plt
+from jiwer import wer
 # from LJ_SPeech_preprocess import *
 # from UA_Speech_preprocess import *
 
@@ -497,7 +498,7 @@ class DisplayOutputs(keras.callbacks.Callback):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            score = self.model.wer(target_text.split(),prediction.split())
+            score = wer(target_text, prediction)
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
             self.model.save_weights(f'Timit_Base.h5')
@@ -522,9 +523,6 @@ class DisplayOutputs(keras.callbacks.Callback):
 
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
         data.to_excel('ASR Results.xlsx', sheet_name='Timit',index=False)
-        
-        print('Average {} score of ds: {:.2f}\n'.format("WER",  (score)))
-
         return (score)
 
 
@@ -576,17 +574,15 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
 """
 
 # Create a MirroredStrategy.
-
-strategy = tf.distribute.MirroredStrategy(["GPU:1"])
-print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
 print ("TF Version:", tf.__version__)
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 print ("The GPUs are:", tf.config.list_physical_devices('GPU'))
 
-# Open a strategy scope.
-with strategy.scope():
-    # Everything that creates variables should be under the strategy scope.
-    # In general this is only model construction & `compile()`.
+tf.debugging.set_log_device_placement(True)
+
+try:
+  # Specify an invalid GPU device
+  with tf.device('/device:GPU:1'):
     batch = next(iter(val_ds))
 
     # The vocabulary to convert predicted indices into characters
@@ -604,7 +600,7 @@ with strategy.scope():
         num_layers_dec=5,
         num_classes=34,
     )
-    
+
     loss_fn = tf.keras.losses.CategoricalCrossentropy(
         from_logits=True,
         label_smoothing=0.1,
@@ -619,39 +615,42 @@ with strategy.scope():
         steps_per_epoch=len(ds),
     )
     optimizer = keras.optimizers.Adam(learning_rate)
-    set_gpus("1")
+
     model.compile(optimizer=optimizer, loss=loss_fn)
     # Train the model on all available devices.
-    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=1)
+    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
     model.summary();
+    
+    #loading weights
+    # quick model fit to get input shape for loading weights
+    # model.fit(val_ds.take(1), epochs=1, verbose=0)
+    # model.load_weights(f'LJSpeech.h5')
+    # model.summary(); 
+    # # for layers in (model.layers)[2]:
+    # #     print(layers)
+    # #     layers.trainable = False
+    # print((model.layers)[2])
+    # ((model.layers)[2]).trainable = False
+    # model.compile(optimizer=optimizer, loss=loss_fn)
+    # history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+    # Plot 
+    # Get training and test loss histories
+    training_loss = history.history['loss']
+    test_loss = history.history['val_loss']
 
-#loading weights
-# quick model fit to get input shape for loading weights
-# model.fit(val_ds.take(1), epochs=1, verbose=0)
-# model.load_weights(f'LJSpeech.h5')
-# model.summary(); 
-# # for layers in (model.layers)[2]:
-# #     print(layers)
-# #     layers.trainable = False
-# print((model.layers)[2])
-# ((model.layers)[2]).trainable = False
-# model.compile(optimizer=optimizer, loss=loss_fn)
-# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+    # Create count of the number of epochs
+    epoch_count = range(1, len(training_loss) + 1)
+
+    # Visualize loss history
+    plt.plot(epoch_count, training_loss, 'r--')
+    plt.plot(epoch_count, test_loss, 'b-')
+    plt.legend(['Training Loss', 'Test Loss'])
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.savefig("training vs loss.png")
+    plt.show()
+except RuntimeError as e:
+  print(e)
 
 
-# Plot 
-# Get training and test loss histories
-training_loss = history.history['loss']
-test_loss = history.history['val_loss']
 
-# Create count of the number of epochs
-epoch_count = range(1, len(training_loss) + 1)
-
-# Visualize loss history
-plt.plot(epoch_count, training_loss, 'r--')
-plt.plot(epoch_count, test_loss, 'b-')
-plt.legend(['Training Loss', 'Test Loss'])
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.savefig("training vs loss.png")
-plt.show()
