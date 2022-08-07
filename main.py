@@ -1,21 +1,19 @@
 import os
 import random
 from glob import glob
-from tkinter import Label
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import re
-import tensorflow_io as tfio
-import numpy as np
+# initialisation
+import numpy
 import pandas as pd
-import wave
-from scipy.io import wavfile
-import contextlib
-import librosa 
-import soundfile as sf
 from matplotlib import pyplot as plt
-from wer import *
+# from LJ_SPeech_preprocess import *
+# from UA_Speech_preprocess import *
+
+def set_gpus(gpus_number="1,2"):
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
 """
 ## Define the Transformer Input Layer
@@ -24,6 +22,8 @@ position embeddings and token embeddings.
 When processing audio features, we apply convolutional layers to downsample
 them (via convolution stides) and process local relationships.
 """
+
+
 class TokenEmbedding(layers.Layer):
     def __init__(self, num_vocab=1000, maxlen=100, num_hid=64):
         super().__init__()
@@ -61,6 +61,8 @@ class SpeechFeatureEmbedding(layers.Layer):
 """
 ## Transformer Encoder Layer
 """
+
+
 class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
         super().__init__()
@@ -88,6 +90,8 @@ class TransformerEncoder(layers.Layer):
 """
 ## Transformer Decoder Layer
 """
+
+
 class TransformerDecoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, dropout_rate=0.1):
         super().__init__()
@@ -144,6 +148,8 @@ During training, we give the decoder the target character sequence shifted to th
 as input. During inference, the decoder uses its own past predictions to predict the
 next token.
 """
+
+
 class Transformer(keras.Model):
     def __init__(
         self,
@@ -162,8 +168,9 @@ class Transformer(keras.Model):
         self.num_layers_dec = num_layers_dec
         self.target_maxlen = target_maxlen
         self.num_classes = num_classes
-        self.model_name = 'Base_model_hypertune'
-        
+        self.vectorizer = VectorizeChar(max_len=self.target_maxlen)
+        self.idx_to_char = self.vectorizer.get_vocabulary()
+
         self.enc_input = SpeechFeatureEmbedding(num_hid=num_hid, maxlen=source_maxlen)
         self.dec_input = TokenEmbedding(
             num_vocab=num_classes, maxlen=target_maxlen, num_hid=num_hid
@@ -247,7 +254,75 @@ class Transformer(keras.Model):
             dec_input = tf.concat([dec_input, last_logit], axis=-1)
         return dec_input
 
+    def wer(self,r, h):
 
+        d = numpy.zeros((len(r) + 1) * (len(h) + 1), dtype=numpy.uint8)
+        d = d.reshape((len(r) + 1, len(h) + 1))
+        for i in range(len(r) + 1):
+            for j in range(len(h) + 1):
+                if i == 0:
+                    d[0][j] = j
+                elif j == 0:
+                    d[i][0] = i
+
+        # computation
+        for i in range(1, len(r) + 1):
+            for j in range(1, len(h) + 1):
+                if r[i - 1] == h[j - 1]:
+                    d[i][j] = d[i - 1][j - 1]
+                else:
+                    substitution = d[i - 1][j - 1] + 1
+                    insertion = d[i][j - 1] + 1
+                    deletion = d[i - 1][j] + 1
+                    d[i][j] = min(substitution, insertion, deletion)
+
+        return d[len(r)][len(h)]
+   
+    def predictions(self, batch, logs=None):
+        score = 0
+        source = batch["source"]
+        target = batch["target"].numpy()
+        bs = tf.shape(source)[0]
+        preds = self.generate(source, 2)
+        preds = preds.numpy()
+        for i in range(bs):
+            target_text = "".join([self.idx_to_char[_] for _ in target[i, :]])
+            prediction = ""
+            for idx in preds[i, :]:
+                prediction += self.idx_to_char[idx]
+                if idx == 3:
+                    break
+            print(f"target:     {target_text.replace('-','')}")
+            print(f"prediction: {prediction}\n")
+            target_text = target_text.replace("-","")
+            score = self.wer(target_text.split(),prediction.split())
+
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
+        return score, target_text, prediction, bs  
+
+    def get_accuracy(self, val_ds,logs=None):
+
+        target = []
+        word_error_rate = []
+        prediction = []
+        score = 0
+        samples = 0
+        ds_itr = iter(val_ds)
+
+        for batch in ds_itr:
+            score_per_batch, target_per_batch, prediction_per_batch,bs = self.predictions(batch)
+            target.append(target_per_batch)
+            prediction.append(prediction_per_batch)
+            word_error_rate.append(score_per_batch)
+            score += score_per_batch
+            samples += bs
+
+        data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
+        data.to_excel('ASR Results.xlsx', sheet_name='',index=False)
+        
+        #print('Average {} score of ds: {:.2f}\n'.format("WER", 1 - (score / float(samples))))
+
+        return 1 - (score / float(samples))
 """
 ## Download the dataset
 Note: This requires ~3.6 GB of disk space and
@@ -263,9 +338,7 @@ def get_data_TIMIT():
         for line in f:
             words = line.split()[2:]
             name = file.split(".")[1]
-            print(name)
             wav = '.' + name + '.wav'
-            print(wav)
             word_list = list()
             for word in words:
                 word = word.lower()
@@ -281,9 +354,7 @@ def get_data_TIMIT():
         for line in f:
             words = line.split()[2:]
             name = file.split(".")[1]
-            print(name)
             wav = '.' + name + '.wav'
-            print(wav)
             word_list = list()
             for word in words:
                 word = word.lower()
@@ -292,25 +363,13 @@ def get_data_TIMIT():
                 word_list.append(word)
             full_sen = " ".join(word_list)
             timit_data_test.append({"audio": wav, "text": full_sen})
-            
-    
     return timit_data_train, timit_data_test
-
-   
-#     res = [d for d in data if d['audio'] not in testing_data]
-
-#     print(sum(1 for d in res if d)) #training data
-#     print("testing data size")
-#     print(sum(1 for d in testing if d)) #All Data
-#     return res,testing
-
-#LABELS = ['bed']
-#LABELS = ['backward','bed','bird','cat','dog','down','eight','five','follow','four','go','happy','house','learn','left','marvin','nine','no','off','on','right','seven','sheila','six','stop','three','tree','two','up','visual','wow','yes','zero']
-#LABELS = ['bed','bird','cat','dog','down','eight','five','four','go','happy','house','left','marvin','nine','no','off','on','one','right','seven','sheila','six','stop','three','tree','two','up','wow','yes','zero']
 
 """
 ## Preprocess the dataset
 """
+
+
 class VectorizeChar:
     def __init__(self, max_len=50):
         self.vocab = (
@@ -333,10 +392,14 @@ class VectorizeChar:
     def get_vocabulary(self):
         return self.vocab
 
-
+SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+SPEAKERS_TEST = ['CM06']
 max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_data_TIMIT()
+#data_test = get_dataset_UA(SPEAKERS_TEST)
 vectorizer = VectorizeChar(max_target_len)
+print("vocab size", len(vectorizer.get_vocabulary()))
+
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
@@ -361,7 +424,6 @@ def path_to_audio(path):
     pad_len = 2754
     paddings = tf.constant([[0, pad_len], [0, 0]])
     x = tf.pad(x, paddings, "CONSTANT")[:pad_len, :]
-    # tf.print(x)
     return x
 
 
@@ -370,7 +432,6 @@ def create_audio_ds(data):
     audio_ds = tf.data.Dataset.from_tensor_slices(flist)
     audio_ds = audio_ds.map(path_to_audio, num_parallel_calls=tf.data.AUTOTUNE)
     return audio_ds
-
 
 
 def create_tf_dataset(data, bs=4):
@@ -383,40 +444,18 @@ def create_tf_dataset(data, bs=4):
     return ds
 
 
-indexes = []
-audio_ds = create_audio_ds(data_train)   
-for index,val in enumerate(list(audio_ds)):
-    df = pd.DataFrame(val)   
-    if(df.isnull().sum().sum() > 0):
-        indexes.append(index)
-
-indexes = sorted(indexes, reverse=True)
-# Traverse the indices list
-for index in indexes:
-    if index < len(data_train):
-        data_train.pop(index)
-
-#data_test
-test_index = []
-audio_dss = create_audio_ds(data_test)   
-for indexx,vall in enumerate(list(audio_dss)):
-    df = pd.DataFrame(vall)   
-    if(df.isnull().sum().sum() > 0):
-        test_index.append(indexx)
-
-test_index = sorted(test_index, reverse=True)
-# Traverse the indices list
-for index in test_index:
-    if index < len(data_test):
-        data_test.pop(index)
-
-print("training data size after porcess")
-print(sum(1 for d in data_train if d)) 
-print("testing data size after porcess")
-print(sum(1 for d in data_test if d)) 
-
+# train_data = data_train
+# print(sum(1 for d in train_data if d))
+# test_data = data_test
+# print(sum(1 for d in test_data if d))
+# ds = create_tf_dataset(train_data, bs=64)
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs=1)
+# train_data = data[:split]
+# test_data = data[split:]
+# test_LJ = create_tf_dataset(test_data, bs=1)
+# ds = create_tf_dataset(train_data, bs=64)
+# val_ds = create_tf_dataset(test_data, bs=1)
 
 
 """
@@ -442,8 +481,6 @@ class DisplayOutputs(keras.callbacks.Callback):
         self.val_ds = val_ds
 
     def on_epoch_end(self, epoch, logs=None):
-        # if epoch % 5 != 0:
-        #
         score = 0
         source = self.batch["source"]
         target = self.batch["target"].numpy()
@@ -459,17 +496,15 @@ class DisplayOutputs(keras.callbacks.Callback):
                     break
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
-            
-            score = wer(target_text.split(),prediction.split());
+            target_text = target_text.replace("-","")
+            score = self.model.wer(target_text.split(),prediction.split())
 
-            print('{} score of one validation batch: {:.2f}\n'.format("WER",  score))
-            self.model.save_weights(f'./datasets{self.model.model_name}.keras')
-            self.model.save_weights(f'Timit base.h5')
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
+            self.model.save_weights(f'Timit_Base.h5')
         return score, target_text, prediction, bs
 
-    def on_train_end(self, logs=None):
-        """Get the accuracy score from a dataset. The possible metrics are: BLEU score and Word Error Rate"""
-        
+    def on_train_end(self,logs=None):
+
         target = []
         word_error_rate = []
         prediction = []
@@ -485,12 +520,12 @@ class DisplayOutputs(keras.callbacks.Callback):
             score += score_per_batch
             samples += bs
 
-
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
-        print('End of train')
-        return 1 - (score / float(samples))
+        data.to_excel('ASR Results.xlsx', sheet_name='Timit',index=False)
+        
+        print('Average {} score of ds: {:.2f}\n'.format("WER",  (score)))
 
+        return (score)
 
 
 """
@@ -502,7 +537,7 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
         self,
         init_lr=0.00001,
-        lr_after_warmup=0.001, #Change learning rate of entire model
+        lr_after_warmup=0.001,
         final_lr=0.00001,
         warmup_epochs=15,
         decay_epochs=85,
@@ -540,39 +575,72 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
 ## Create & train the end-to-end model
 """
 
-batch = next(iter(val_ds))
+# Create a MirroredStrategy.
 
-# The vocabulary to convert predicted indices into characters
-idx_to_char = vectorizer.get_vocabulary()
-display_cb = DisplayOutputs(
-    batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
-)  # set the arguments as per vocabulary index for '<' and '>'
+strategy = tf.distribute.MirroredStrategy(["GPU:1"])
+print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+print ("TF Version:", tf.__version__)
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+print ("The GPUs are:", tf.config.list_physical_devices('GPU'))
 
-model = Transformer(
-    num_hid=64,
-    num_head=8,
-    num_feed_forward=512,
-    target_maxlen=max_target_len,
-    num_layers_enc=1,
-    num_layers_dec=5,
-    num_classes=34,
-)
-loss_fn = tf.keras.losses.CategoricalCrossentropy(
-    from_logits=True,
-    label_smoothing=0.1,
-)
+# Open a strategy scope.
+with strategy.scope():
+    # Everything that creates variables should be under the strategy scope.
+    # In general this is only model construction & `compile()`.
+    batch = next(iter(val_ds))
 
-learning_rate = CustomSchedule(
-    init_lr=0.00001,
-    lr_after_warmup=0.001,
-    final_lr=0.00001,
-    warmup_epochs=15,
-    decay_epochs=85,
-    steps_per_epoch=len(ds),
-)
-optimizer = keras.optimizers.Adam(learning_rate)
-model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+    # The vocabulary to convert predicted indices into characters
+    idx_to_char = vectorizer.get_vocabulary()
+    display_cb = DisplayOutputs(
+        batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
+    )  # set the arguments as per vocabulary index for '<' and '>'
+
+    model = Transformer(
+        num_hid=64,
+        num_head=2,
+        num_feed_forward=512,
+        target_maxlen=max_target_len,
+        num_layers_enc=1,
+        num_layers_dec=5,
+        num_classes=34,
+    )
+    
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(
+        from_logits=True,
+        label_smoothing=0.1,
+    )
+
+    learning_rate = CustomSchedule(
+        init_lr=0.00001,
+        lr_after_warmup=0.001,
+        final_lr=0.00001,
+        warmup_epochs=15,
+        decay_epochs=85,
+        steps_per_epoch=len(ds),
+    )
+    optimizer = keras.optimizers.Adam(learning_rate)
+    set_gpus("1")
+    model.compile(optimizer=optimizer, loss=loss_fn)
+    # Train the model on all available devices.
+    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=1)
+    model.summary();
+
+#loading weights
+# quick model fit to get input shape for loading weights
+# model.fit(val_ds.take(1), epochs=1, verbose=0)
+# model.load_weights(f'LJSpeech.h5')
+# model.summary(); 
+# # for layers in (model.layers)[2]:
+# #     print(layers)
+# #     layers.trainable = False
+# print((model.layers)[2])
+# ((model.layers)[2]).trainable = False
+# model.compile(optimizer=optimizer, loss=loss_fn)
+# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+
+
+# Plot 
+# Get training and test loss histories
 training_loss = history.history['loss']
 test_loss = history.history['val_loss']
 
@@ -587,15 +655,3 @@ plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.savefig("training vs loss.png")
 plt.show()
-
-
-"""
-In practice, you should train for around 100 epochs or more.
-Some of the predicted text at or around epoch 35 may look as follows:
-```
-target:     <as they sat in the car, frazier asked oswald where his lunch was>
-prediction: <as they sat in the car frazier his lunch ware mis lunch was>
-target:     <under the entry for may one, nineteen sixty,>
-prediction: <under the introus for may monee, nin the sixty,>
-```
-"""
