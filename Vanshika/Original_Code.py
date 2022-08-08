@@ -36,7 +36,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
-
+from jiwer import wer
 """
 ## Define the Transformer Input Layer
 When processing past target tokens for the decoder, we compute the sum of
@@ -317,7 +317,7 @@ class Transformer(keras.Model):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            score = self.wer(target_text.split(),prediction.split())
+            score = wer(target_text, prediction)
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
         return score, target_text, prediction, bs  
@@ -453,14 +453,14 @@ def create_tf_dataset(data, bs=4):
 # test_data = data_test
 # print(sum(1 for d in test_data if d))
 # ds = create_tf_dataset(train_data, bs=64)
+# ds = create_tf_dataset(data_train, bs=64)
+# val_ds = create_tf_dataset(data_test, bs=1)
+# split = int(len(data) * 0.99)
+# data_train = data[:split]
+# data_test = data[split:]
+#test_LJ = create_tf_dataset(data_test, bs=1)
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs=1)
-split = int(len(data) * 0.99)
-# train_data = data[:split]
-test_data = data[split:]
-test_LJ = create_tf_dataset(test_data, bs=1)
-# ds = create_tf_dataset(train_data, bs=64)
-# val_ds = create_tf_dataset(test_data, bs=1)
 
 
 """
@@ -502,10 +502,10 @@ class DisplayOutputs(keras.callbacks.Callback):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            score = self.model.wer(target_text.split(),prediction.split())
+            score = wer(target_text, prediction)
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
-            self.model.save_weights(f'LJSpeech_Transfer_L2.h5')
+            self.model.save_weights(f'LJSPEECH_NEWHYPER_L23.h5')
         return score, target_text, prediction, bs
 
     def on_train_end(self,logs=None):
@@ -590,10 +590,10 @@ display_cb = DisplayOutputs(
 
 model = Transformer(
     num_hid=64,
-    num_head=8,
+    num_head=2,
     num_feed_forward=512,
     target_maxlen=max_target_len,
-    num_layers_enc=1,
+    num_layers_enc=2,
     num_layers_dec=5,
     num_classes=34,
 )
@@ -612,7 +612,7 @@ learning_rate = CustomSchedule(
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn)
-#history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+#history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
 #loading weights
 def build_model():
     model = Transformer(
@@ -642,13 +642,14 @@ def build_model():
     return model
 # quick model fit to get input shape for loading weights
 model.fit(val_ds.take(1), epochs=1, verbose=0)
-model.load_weights(f'LJSpeech.h5')
+model.load_weights(f'LJSPEECH_NEWHYPER.h5')
 model.summary(); 
 # for layers in (model.layers)[2]:
 #     print(layers)
 #     layers.trainable = False
-print((model.layers)[2])
+# print((model.layers)[2])
 ((model.layers)[2]).trainable = False
+((model.layers)[3]).trainable = False
 model.compile(optimizer=optimizer, loss=loss_fn)
 history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
 
