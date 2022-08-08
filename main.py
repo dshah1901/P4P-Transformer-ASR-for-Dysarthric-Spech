@@ -10,6 +10,7 @@ import numpy
 import pandas as pd
 from matplotlib import pyplot as plt
 from jiwer import wer
+import tensorflow_io as tfio
 # from LJ_SPeech_preprocess import *
 # from UA_Speech_preprocess import *
 
@@ -23,7 +24,6 @@ position embeddings and token embeddings.
 When processing audio features, we apply convolutional layers to downsample
 them (via convolution stides) and process local relationships.
 """
-
 
 class TokenEmbedding(layers.Layer):
     def __init__(self, num_vocab=1000, maxlen=100, num_hid=64):
@@ -62,7 +62,6 @@ class SpeechFeatureEmbedding(layers.Layer):
 """
 ## Transformer Encoder Layer
 """
-
 
 class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
@@ -254,80 +253,8 @@ class Transformer(keras.Model):
             dec_logits.append(last_logit)
             dec_input = tf.concat([dec_input, last_logit], axis=-1)
         return dec_input
-
-    def wer(self,r, h):
-
-        d = numpy.zeros((len(r) + 1) * (len(h) + 1), dtype=numpy.uint8)
-        d = d.reshape((len(r) + 1, len(h) + 1))
-        for i in range(len(r) + 1):
-            for j in range(len(h) + 1):
-                if i == 0:
-                    d[0][j] = j
-                elif j == 0:
-                    d[i][0] = i
-
-        # computation
-        for i in range(1, len(r) + 1):
-            for j in range(1, len(h) + 1):
-                if r[i - 1] == h[j - 1]:
-                    d[i][j] = d[i - 1][j - 1]
-                else:
-                    substitution = d[i - 1][j - 1] + 1
-                    insertion = d[i][j - 1] + 1
-                    deletion = d[i - 1][j] + 1
-                    d[i][j] = min(substitution, insertion, deletion)
-
-        return d[len(r)][len(h)]
-   
-    def predictions(self, batch, logs=None):
-        score = 0
-        source = batch["source"]
-        target = batch["target"].numpy()
-        bs = tf.shape(source)[0]
-        preds = self.generate(source, 2)
-        preds = preds.numpy()
-        for i in range(bs):
-            target_text = "".join([self.idx_to_char[_] for _ in target[i, :]])
-            prediction = ""
-            for idx in preds[i, :]:
-                prediction += self.idx_to_char[idx]
-                if idx == 3:
-                    break
-            print(f"target:     {target_text.replace('-','')}")
-            print(f"prediction: {prediction}\n")
-            target_text = target_text.replace("-","")
-            score = self.wer(target_text.split(),prediction.split())
-
-            print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
-        return score, target_text, prediction, bs  
-
-    def get_accuracy(self, val_ds,logs=None):
-
-        target = []
-        word_error_rate = []
-        prediction = []
-        score = 0
-        samples = 0
-        ds_itr = iter(val_ds)
-
-        for batch in ds_itr:
-            score_per_batch, target_per_batch, prediction_per_batch,bs = self.predictions(batch)
-            target.append(target_per_batch)
-            prediction.append(prediction_per_batch)
-            word_error_rate.append(score_per_batch)
-            score += score_per_batch
-            samples += bs
-
-        data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        data.to_excel('ASR Results.xlsx', sheet_name='',index=False)
-        
-        #print('Average {} score of ds: {:.2f}\n'.format("WER", 1 - (score / float(samples))))
-
-        return 1 - (score / float(samples))
 """
-## Download the dataset
-Note: This requires ~3.6 GB of disk space and
-takes ~5 minutes for the extraction of files.
+## The datasets that can be used here are TIMIT and Libre Speech
 """
 def get_data_TIMIT():
     timit_train =  glob("./TIMIT (MSVAW)/train/*/*/*.txt", recursive=True)
@@ -366,10 +293,49 @@ def get_data_TIMIT():
             timit_data_test.append({"audio": wav, "text": full_sen})
     return timit_data_train, timit_data_test
 
+def get_data_libre():
+    libre_train =  glob("./LibriSpeech/train-clean-100/*/*/*.txt", recursive=True)
+    libri_train_data = list()
+    for file in libre_train:
+        f = open(file, "r")
+        for line in f:
+            number = line.split()[0]
+            words = line.split()[1:]
+            n_1 = number.split('-')[0]
+            n_2 = number.split('-')[1]
+            flac = './LibriSpeech/train-clean-100/' + n_1 + '/' + n_2 + '/' + number + '.flac'
+            word_list = list()
+            for word in words:
+                word = word.lower()
+                word = re.sub('\'s', '', word)
+                word = re.sub('[^a-zA-Z0-9 \n]', '', word)
+                word_list.append(word)
+            full_sen = " ".join(word_list)
+            libri_train_data.append({"audio": flac, "text": full_sen})
+
+    libre_test =  glob("./LibriSpeech/test-clean/*/*/*.txt", recursive=True)
+    libri_test_data = list()
+    for file in libre_test:
+        f = open(file, "r")
+        for line in f:
+            number = line.split()[0]
+            words = line.split()[1:]
+            n_1 = number.split('-')[0]
+            n_2 = number.split('-')[1]
+            flac = './LibriSpeech/test-clean/' + n_1 + '/' + n_2 + '/' + number + '.flac'
+            word_list = list()
+            for word in words:
+                word = word.lower()
+                word = re.sub('\'s', '', word)
+                word = re.sub('[^a-zA-Z0-9 \n]', '', word)
+                word_list.append(word)
+            full_sen = " ".join(word_list)
+            libri_test_data.append({"audio": flac, "text": full_sen})
+    return libri_train_data, libri_test_data
+
 """
 ## Preprocess the dataset
 """
-
 
 class VectorizeChar:
     def __init__(self, max_len=50):
@@ -393,14 +359,13 @@ class VectorizeChar:
     def get_vocabulary(self):
         return self.vocab
 
-SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
-SPEAKERS_TEST = ['CM06']
+#SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+#SPEAKERS_TEST = ['CM06']
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data_train, data_test = get_data_TIMIT()
+
+data_train, data_test = get_data_libre() #Setting the training and testing data
 #data_test = get_dataset_UA(SPEAKERS_TEST)
 vectorizer = VectorizeChar(max_target_len)
-print("vocab size", len(vectorizer.get_vocabulary()))
-
 
 def create_text_ds(data):
     texts = [_["text"] for _ in data]
@@ -412,8 +377,9 @@ def create_text_ds(data):
 def path_to_audio(path):
     # spectrogram using stft
     audio = tf.io.read_file(path)
-    audio, _ = tf.audio.decode_wav(audio, 1)
+    audio = tfio.audio.decode_flac(audio, shape=None, dtype=tf.int16)
     audio = tf.squeeze(audio, axis=-1)
+    audio = tf.cast(audio, tf.float32) / 32768.0
     stfts = tf.signal.stft(audio, frame_length=200, frame_step=80, fft_length=256)
     x = tf.math.pow(tf.abs(stfts), 0.5)
     # normalisation
@@ -422,10 +388,25 @@ def path_to_audio(path):
     x = (x - means) / stddevs
     audio_len = tf.shape(x)[0]
     # padding to 10 seconds
-    pad_len = 2754
+    pad_len = 3000
     paddings = tf.constant([[0, pad_len], [0, 0]])
     x = tf.pad(x, paddings, "CONSTANT")[:pad_len, :]
     return x
+    # audio, _ = tf.audio.decode_wav(audio, 1)
+    # audio = tfio.audio.decode_flac(audio, shape=None, dtype=tf.int16)
+    # audio = tf.squeeze(audio, axis=-1)
+    # stfts = tf.signal.stft(audio, frame_length=200, frame_step=80, fft_length=256)
+    # x = tf.math.pow(tf.abs(stfts), 0.5)
+    # # normalisation
+    # means = tf.math.reduce_mean(x, 1, keepdims=True)
+    # stddevs = tf.math.reduce_std(x, 1, keepdims=True)
+    # x = (x - means) / stddevs
+    # audio_len = tf.shape(x)[0]
+    # # padding to 10 seconds
+    # pad_len = 2754
+    # paddings = tf.constant([[0, pad_len], [0, 0]])
+    # x = tf.pad(x, paddings, "CONSTANT")[:pad_len, :]
+    # return x
 
 
 def create_audio_ds(data):
@@ -445,24 +426,45 @@ def create_tf_dataset(data, bs=4):
     return ds
 
 
-# train_data = data_train
-# print(sum(1 for d in train_data if d))
-# test_data = data_test
-# print(sum(1 for d in test_data if d))
-# ds = create_tf_dataset(train_data, bs=64)
+indexes = []
+audio_ds = create_audio_ds(data_train)   
+for index,val in enumerate(list(audio_ds)):
+    df = pd.DataFrame(val)   
+    if(df.isnull().sum().sum() > 0):
+        indexes.append(index)
+
+indexes = sorted(indexes, reverse=True)
+# Traverse the indices list
+for index in indexes:
+    if index < len(data_train):
+        data_train.pop(index)
+
+#data_test
+test_index = []
+audio_dss = create_audio_ds(data_test)   
+for indexx,vall in enumerate(list(audio_dss)):
+    df = pd.DataFrame(vall)   
+    if(df.isnull().sum().sum() > 0):
+        test_index.append(indexx)
+
+test_index = sorted(test_index, reverse=True)
+# Traverse the indices list
+for index in test_index:
+    if index < len(data_test):
+        data_test.pop(index)
+
+print("training data size after porcess")
+print(sum(1 for d in data_train if d)) 
+print("testing data size after porcess")
+print(sum(1 for d in data_test if d))
+
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs=1)
-# train_data = data[:split]
-# test_data = data[split:]
-# test_LJ = create_tf_dataset(test_data, bs=1)
-# ds = create_tf_dataset(train_data, bs=64)
-# val_ds = create_tf_dataset(test_data, bs=1)
 
 
 """
 ## Callbacks to display predictions
 """
-
 
 class DisplayOutputs(keras.callbacks.Callback):
     def __init__(
@@ -501,7 +503,7 @@ class DisplayOutputs(keras.callbacks.Callback):
             score = wer(target_text, prediction)
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
-            self.model.save_weights(f'Timit_Base.h5')
+            self.model.save_weights(f'Libre_Base.h5')
         return score, target_text, prediction, bs
 
     def on_train_end(self,logs=None):
@@ -522,7 +524,7 @@ class DisplayOutputs(keras.callbacks.Callback):
             samples += bs
 
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        data.to_excel('ASR Results.xlsx', sheet_name='Timit',index=False)
+        data.to_excel('ASR Results.xlsx', sheet_name='Libre Speech',index=False)
         return (score)
 
 
@@ -573,16 +575,14 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
 ## Create & train the end-to-end model
 """
 
-# Create a MirroredStrategy.
+# Training on GPU 1
 print ("TF Version:", tf.__version__)
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 print ("The GPUs are:", tf.config.list_physical_devices('GPU'))
 
 tf.debugging.set_log_device_placement(True)
 
-try:
-  # Specify an invalid GPU device
-  with tf.device('/device:GPU:1'):
+with tf.device('/device:GPU:1'):
     batch = next(iter(val_ds))
 
     # The vocabulary to convert predicted indices into characters
@@ -617,8 +617,7 @@ try:
     optimizer = keras.optimizers.Adam(learning_rate)
 
     model.compile(optimizer=optimizer, loss=loss_fn)
-    # Train the model on all available devices.
-    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
+    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
     model.summary();
     
     #loading weights
@@ -649,8 +648,7 @@ try:
     plt.ylabel('Loss')
     plt.savefig("training vs loss.png")
     plt.show()
-except RuntimeError as e:
-  print(e)
+
 
 
 
