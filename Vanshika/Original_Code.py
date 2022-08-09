@@ -275,31 +275,7 @@ class Transformer(keras.Model):
             dec_logits.append(last_logit)
             dec_input = tf.concat([dec_input, last_logit], axis=-1)
         return dec_input
-
-    def wer(self,r, h):
-
-        d = numpy.zeros((len(r) + 1) * (len(h) + 1), dtype=numpy.uint8)
-        d = d.reshape((len(r) + 1, len(h) + 1))
-        for i in range(len(r) + 1):
-            for j in range(len(h) + 1):
-                if i == 0:
-                    d[0][j] = j
-                elif j == 0:
-                    d[i][0] = i
-
-        # computation
-        for i in range(1, len(r) + 1):
-            for j in range(1, len(h) + 1):
-                if r[i - 1] == h[j - 1]:
-                    d[i][j] = d[i - 1][j - 1]
-                else:
-                    substitution = d[i - 1][j - 1] + 1
-                    insertion = d[i][j - 1] + 1
-                    deletion = d[i - 1][j] + 1
-                    d[i][j] = min(substitution, insertion, deletion)
-
-        return d[len(r)][len(h)]
-    
+   
     def predictions(self, batch, logs=None):
         score = 0
         source = batch["source"]
@@ -317,7 +293,7 @@ class Transformer(keras.Model):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            score = wer(target_text, prediction)
+            score += wer(target_text, prediction)
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
         return score, target_text, prediction, bs  
@@ -343,9 +319,9 @@ class Transformer(keras.Model):
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
         data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
         
-        print('Average {} score of ds: {:.2f}\n'.format("WER", 1 - (score / float(samples))))
+        print('Average {} score of ds: {:.2f}\n'.format("WER", (score / float(samples))))
 
-        return 1 - (score / float(samples))
+        return (score / float(samples))
 """
 ## Download the dataset
 Note: This requires ~3.6 GB of disk space and
@@ -460,7 +436,7 @@ def create_tf_dataset(data, bs=4):
 # data_test = data[split:]
 #test_LJ = create_tf_dataset(data_test, bs=1)
 ds = create_tf_dataset(data_train, bs=64)
-val_ds = create_tf_dataset(data_test, bs=1)
+val_ds = create_tf_dataset(data_test, bs =64)
 
 
 """
@@ -502,13 +478,16 @@ class DisplayOutputs(keras.callbacks.Callback):
             print(f"target:     {target_text.replace('-','')}")
             print(f"prediction: {prediction}\n")
             target_text = target_text.replace("-","")
-            score = wer(target_text, prediction)
+            score += wer(target_text, prediction)
 
-            print('{} score of one validation batch: {:.2f}\n'.format("WER", score))
+
+            print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
+
             self.model.save_weights(f'LJSPEECH_NEWHYPER_L23.h5')
+        print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         return score, target_text, prediction, bs
 
-    def on_train_end(self,logs=None):
+    def on_train_end(self,logs=None): 
 
         target = []
         word_error_rate = []
@@ -651,7 +630,7 @@ model.summary();
 ((model.layers)[2]).trainable = False
 ((model.layers)[3]).trainable = False
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=2)
 
 
 # Plot 
