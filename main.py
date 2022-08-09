@@ -57,18 +57,25 @@ class SpeechFeatureEmbedding(layers.Layer):
 """
 ## Transformer Encoder Layer
 """
+     
 
+    def call(self, inputs, training):
+        attn_output = self.att(inputs, inputs) #multi head attention
+        attn_output = self.dropout1(attn_output, training=training) #add dropout
+        out1 = self.layernorm1(inputs + attn_output) #normalisation
+        ffn_output = self.ffn(out1) 
+        ffn_output = self.dropout2(ffn_output, training=training)
+        out2 =self.layernorm2(out1 + ffn_output)
+        enc_out = self.att_1(out2, out2)
+        enc_out_norm = self.layernorm1_1(self.dropout1_1(enc_out) + out2)
+        ffn_out = self.ffn_1(enc_out_norm)
+        ffn_out_norm = self.layernorm2_1(enc_out_norm + self.dropout2_1(ffn_out))
+        return ffn_out_norm
 
 class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
         super().__init__()
         self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        # self.ffn = keras.Sequential(
-        #     [
-        #         layers.Dense(feed_forward_dim, activation="relu"),
-        #         layers.Dense(embed_dim),
-        #     ]
-        # )
         self.cnn = keras.Sequential(
             [
                 layers.Conv1D(feed_forward_dim, 1, activation="relu"),
@@ -80,15 +87,38 @@ class TransformerEncoder(layers.Layer):
         self.dropout1 = layers.Dropout(rate)
         self.dropout2 = layers.Dropout(rate)
 
+         #second 
+        self.att_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.cnn_1 = keras.Sequential(
+            [
+                layers.Conv1D(feed_forward_dim, 1, activation="relu"),
+                layers.Conv1D(embed_dim, 1),
+            ]
+        )
+        self.layernorm1_1 = layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2_1 = layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1_1 = layers.Dropout(rate)
+        self.dropout2_1 = layers.Dropout(rate)
+
     def call(self, inputs, training):
-        attn_output = self.att(inputs, inputs)
-        attn_output = self.dropout1(attn_output, training=training)
-        out1 = self.layernorm1(inputs + attn_output)
-        ffn_output = self.cnn(out1)
-        ffn_output = self.dropout2(ffn_output, training=training)
-        return self.layernorm2(out1 + ffn_output)
+        attn_output = self.att(inputs, inputs) #multi head attention
+        attn_output = self.dropout1(attn_output, training=training) #add dropout
+        out1 = self.layernorm1(inputs + attn_output) #normalisation
+        cnn_output = self.cnn(out1) 
+        cnn_output = self.dropout2(cnn_output, training=training)
+        out2 =self.layernorm2(out1 + cnn_output)
+        enc_out = self.att_1(out2, out2)
+        enc_out_norm = self.layernorm1_1(self.dropout1_1(enc_out) + out2)
+        cnn_out = self.cnn_1(enc_out_norm)
+        cnn_out_norm = self.layernorm2_1(enc_out_norm + self.dropout2_1(cnn_out))
+        return cnn_out_norm
 
-
+# self.ffn = keras.Sequential(
+        #     [
+        #         layers.Dense(feed_forward_dim, activation="relu"),
+        #         layers.Dense(embed_dim),
+        #     ]
+        # )
 """
 ## Transformer Decoder Layer
 """
