@@ -62,7 +62,7 @@ class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
         super().__init__()
         self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        self.cnn = keras.Sequential(
+        self.fnn = keras.Sequential(
             [
                 layers.Dense(feed_forward_dim, activation="relu"),
                 layers.Dense(embed_dim),
@@ -73,31 +73,25 @@ class TransformerEncoder(layers.Layer):
         self.dropout1 = layers.Dropout(rate)
         self.dropout2 = layers.Dropout(rate)
 
-         #second 
-        self.att_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        self.fnn = keras.Sequential(
-            [
-                layers.Conv1D(feed_forward_dim, 1, activation="relu"),
-                layers.Conv1D(embed_dim, 1),
-            ]
-        )
-        self.layernorm1_1 = layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2_1 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1_1 = layers.Dropout(rate)
-        self.dropout2_1 = layers.Dropout(rate)
-
     def call(self, inputs, training):
         attn_output = self.att(inputs, inputs) #multi head attention
         attn_output = self.dropout1(attn_output, training=training) #add dropout
         out1 = self.layernorm1(inputs + attn_output) #normalisation
-        cnn_output = self.cnn(out1) 
-        cnn_output = self.dropout2(cnn_output, training=training)
-        out2 =self.layernorm2(out1 + cnn_output)
-        enc_out = self.att_1(out2, out2)
-        enc_out_norm = self.layernorm1_1(self.dropout1_1(enc_out) + out2)
-        cnn_out = self.fnn(enc_out_norm)
-        cnn_out_norm = self.layernorm2_1(enc_out_norm + self.dropout2_1(cnn_out))
-        return cnn_out_norm
+        fnn_output = self.fnn(out1) 
+        fnn_output = self.dropout2(fnn_output, training=training)
+        out2 =self.layernorm2(out1 + fnn_output)
+        
+        enc_out = self.att(out2, out2)
+        enc_out_norm = self.layernorm1(self.dropout1(enc_out) + out2)
+        fnn_out = self.fnn(enc_out_norm)
+        fnn_out_norm = self.layernorm2(enc_out_norm + self.dropout2(fnn_out))
+
+        enc_out_2 = self.att(fnn_out_norm, fnn_out_norm)
+        enc_out_norm_2 = self.layernorm1(self.dropout1(enc_out_2) + fnn_out_norm)
+        fnn_out_2 = self.fnn(enc_out_norm_2)
+        fnn_out_norm_2 = self.layernorm2(enc_out_norm_2 + self.dropout2(fnn_out_2))
+        
+        return fnn_out_norm_2
 
 # self.ffn = keras.Sequential(
         #     [
