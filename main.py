@@ -1,16 +1,18 @@
 import os
+# Making only GPU 1 visible so it only trains on it
+os.environ["CUDA_VISIBLE_DEVICES"]="1" 
 import random
 from glob import glob
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-# initialisation
 import numpy
 import pandas as pd
 from matplotlib import pyplot as plt
 #from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
 from jiwer import wer
+
 """
 ## Define the Transformer Input Layer
 When processing past target tokens for the decoder, we compute the sum of
@@ -62,13 +64,7 @@ class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, rate=0.1):
         super().__init__()
         self.att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        self.ffn = keras.Sequential(
-            [
-                layers.SeparableConv1D(feed_forward_dim, 1, activation="relu"),
-                layers.SeparableConv1D(embed_dim, 1),
-            ]
-        )
-        self.ffn_2 = keras.Sequential(
+        self.cnn = keras.Sequential(
             [
                 layers.SeparableConv1D(feed_forward_dim, 1, activation="relu"),
                 layers.SeparableConv1D(embed_dim, 1),
@@ -78,18 +74,32 @@ class TransformerEncoder(layers.Layer):
         self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
         self.dropout1 = layers.Dropout(rate)
         self.dropout2 = layers.Dropout(rate)
-        self.dropout2_2 = layers.Dropout(rate)
+
+        #second 
+        self.att_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.cnn_1 = keras.Sequential(
+            [
+                layers.SeparableConv1D(feed_forward_dim, 1, activation="relu"),
+                layers.SeparableConv1D(embed_dim, 1),
+            ]
+        )
+        self.layernorm1_1 = layers.LayerNormalization(epsilon=1e-6)
+        self.layernorm2_1 = layers.LayerNormalization(epsilon=1e-6)
+        self.dropout1_1 = layers.Dropout(rate)
+        self.dropout2_1 = layers.Dropout(rate)
 
     def call(self, inputs, training):
         attn_output = self.att(inputs, inputs) #multi head attention
         attn_output = self.dropout1(attn_output, training=training) #add dropout
         out1 = self.layernorm1(inputs + attn_output) #normalisation
-        ffn_output = self.ffn(out1) 
-        ffn_output = self.dropout2(ffn_output, training=training)
-        ffn_output_2 = self.ffn_2(ffn_output)
-        ffn_output = self.dropout2_2(ffn_output_2, training=training)
-        out2 =self.layernorm2(out1 + ffn_output)
-        return out2
+        cnn_output = self.cnn(out1) 
+        cnn_output = self.dropout2(cnn_output, training=training)
+        out2 =self.layernorm2(out1 + cnn_output)
+        enc_out = self.att_1(out2, out2)
+        enc_out_norm = self.layernorm1_1(self.dropout1_1(enc_out) + out2)
+        cnn_out = self.cnn_1(enc_out_norm)
+        cnn_out_norm = self.layernorm2_1(enc_out_norm + self.dropout2_1(cnn_out))
+        return cnn_out_norm
 
 
 # self.ffn = keras.Sequential(
@@ -305,8 +315,8 @@ class Transformer(keras.Model):
             samples += bs
 
 
-        data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
+        # data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
+        # data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
         
         print('Average {} score of ds: {:.2f}\n'.format("WER", (score / float(samples))))
 
@@ -547,87 +557,80 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
 """
 ## Create & train the end-to-end model
 """
-# Training on GPU 1
-print ("TF Version:", tf.__version__)
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-print ("The GPUs are:", tf.config.list_physical_devices('GPU'))
 
-tf.debugging.set_log_device_placement(True)
+batch = next(iter(val_ds))
 
-with tf.device('/device:GPU:1'):
-    batch = next(iter(val_ds))
+# The vocabulary to convert predicted indices into characters
+idx_to_char = vectorizer.get_vocabulary()
+display_cb = DisplayOutputs(
+    batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
+)  # set the arguments as per vocabulary index for '<' and '>'
 
-    # The vocabulary to convert predicted indices into characters
-    idx_to_char = vectorizer.get_vocabulary()
-    display_cb = DisplayOutputs(
-        batch, idx_to_char, target_start_token_idx=2, target_end_token_idx=3
-    )  # set the arguments as per vocabulary index for '<' and '>'
+model = Transformer(
+    num_hid=64,
+    num_head=2,
+    num_feed_forward=320,
+    target_maxlen=max_target_len,
+    num_layers_enc=5,
+    num_layers_dec=3,
+    num_classes=34,
+)
+loss_fn = tf.keras.losses.CategoricalCrossentropy(
+    from_logits=True,
+    label_smoothing=0.1,
+)
 
-    model = Transformer(
-        num_hid=64,
-        num_head=2,
-        num_feed_forward=512,
-        target_maxlen=max_target_len,
-        num_layers_enc=2,
-        num_layers_dec=5,
-        num_classes=34,
-    )
-    loss_fn = tf.keras.losses.CategoricalCrossentropy(
-        from_logits=True,
-        label_smoothing=0.1,
-    )
+learning_rate = CustomSchedule(
+    init_lr=0.00001,
+    lr_after_warmup=0.001,
+    final_lr=0.00001,
+    warmup_epochs=15,
+    decay_epochs=85,
+    steps_per_epoch=len(ds),
+)
+optimizer = keras.optimizers.Adam(learning_rate)
+model.compile(optimizer=optimizer, loss=loss_fn)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
 
-    learning_rate = CustomSchedule(
-        init_lr=0.00001,
-        lr_after_warmup=0.001,
-        final_lr=0.00001,
-        warmup_epochs=15,
-        decay_epochs=85,
-        steps_per_epoch=len(ds),
-    )
-    optimizer = keras.optimizers.Adam(learning_rate)
-    model.compile(optimizer=optimizer, loss=loss_fn)
-    history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+#loading weights
 
-    #loading weights
+# # quick model fit to get input shape for loading weights
+# model.fit(val_ds.take(1), epochs=1, verbose=0)
+# model.load_weights(f'LJSPEECH_NEWHYPER.h5')
+# model.summary(); 
+# # for layers in (model.layers)[2]:
+# #     print(layers)
+# #     layers.trainable = False
+# # print((model.layers)[2])
+# ((model.layers)[2]).trainable = False
+# ((model.layers)[3]).trainable = False
+# model.compile(optimizer=optimizer, loss=loss_fn)
+# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=2)
 
-    # # quick model fit to get input shape for loading weights
-    # model.fit(val_ds.take(1), epochs=1, verbose=0)
-    # model.load_weights(f'LJSPEECH_NEWHYPER.h5')
-    # model.summary(); 
-    # # for layers in (model.layers)[2]:
-    # #     print(layers)
-    # #     layers.trainable = False
-    # # print((model.layers)[2])
-    # ((model.layers)[2]).trainable = False
-    # ((model.layers)[3]).trainable = False
-    # model.compile(optimizer=optimizer, loss=loss_fn)
-    # history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=2)
+# Plot 
+# Get training and test loss histories
+training_loss = history.history['loss']
+test_loss = history.history['val_loss']
 
-    # Plot 
-    # Get training and test loss histories
-    training_loss = history.history['loss']
-    test_loss = history.history['val_loss']
+# Create count of the number of epochs
+epoch_count = range(1, len(training_loss) + 1)
 
-    # Create count of the number of epochs
-    epoch_count = range(1, len(training_loss) + 1)
+# Visualize loss history
+plt.plot(epoch_count, training_loss, 'r--')
+plt.plot(epoch_count, test_loss, 'b-')
+plt.legend(['Training Loss', 'Test Loss'])
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.savefig("training vs loss.png")
+plt.show()
 
-    # Visualize loss history
-    plt.plot(epoch_count, training_loss, 'r--')
-    plt.plot(epoch_count, test_loss, 'b-')
-    plt.legend(['Training Loss', 'Test Loss'])
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.savefig("training vs loss.png")
-    plt.show()
-
-    """
-    In practice, you should train for around 100 epochs or more.
-    Some of the predicted text at or around epoch 35 may look as follows:
-    ```
-    target:     <as they sat in the car, frazier asked oswald where his lunch was>
-    prediction: <as they sat in the car frazier his lunch ware mis lunch was>
-    target:     <under the entry for may one, nineteen sixty,>
-    prediction: <under the introus for may monee, nin the sixty,>
-    ```
-    """
+"""
+In practice, you should train for around 100 epochs or more.
+Some of the predicted text at or around epoch 35 may look as follows:
+```
+target:     <as they sat in the car, frazier asked oswald where his lunch was>
+prediction: <as they sat in the car frazier his lunch ware mis lunch was>
+target:     <under the entry for may one, nineteen sixty,>
+prediction: <under the introus for may monee, nin the sixty,>
+```
+"""
