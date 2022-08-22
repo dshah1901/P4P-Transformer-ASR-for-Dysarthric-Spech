@@ -9,7 +9,7 @@ from tensorflow.keras import layers
 import numpy
 import pandas as pd
 from matplotlib import pyplot as plt
-#from LJ_SPeech_preprocess import *
+from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
 from jiwer import wer
 
@@ -327,15 +327,15 @@ Note: This requires ~3.6 GB of disk space and
 takes ~5 minutes for the extraction of files.
 """
 
-# saveto = "./datasets/LJSpeech-1.1"
-# wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
+saveto = "./datasets/LJSpeech-1.1"
+wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
 
-# id_to_text = {}
-# with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
-#     for line in f:
-#         id = line.strip().split("|")[0]
-#         text = line.strip().split("|")[2]
-#         id_to_text[id] = text
+id_to_text = {}
+with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
+    for line in f:
+        id = line.strip().split("|")[0]
+        text = line.strip().split("|")[2]
+        id_to_text[id] = text
 
 
 
@@ -368,12 +368,12 @@ class VectorizeChar:
     def get_vocabulary(self):
         return self.vocab
 
-SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
-SPEAKERS_TEST = ['CM06']
+#SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+#SPEAKERS_TEST = ['CM06']
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data_train = get_dataset_UA(SPEAKERS_TRAIN)
-data_test = get_dataset_UA(SPEAKERS_TEST)
-#data = get_data(wavs, id_to_text, max_target_len)
+# data_train = get_dataset_UA(SPEAKERS_TRAIN)
+# data_test = get_dataset_UA(SPEAKERS_TEST)
+data = get_data(wavs, id_to_text, max_target_len)
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
@@ -421,17 +421,12 @@ def create_tf_dataset(data, bs=4):
     return ds
 
 
-# train_data = data_train
-# print(sum(1 for d in train_data if d))
-# test_data = data_test
-# print(sum(1 for d in test_data if d))
-# ds = create_tf_dataset(train_data, bs=64)
-# ds = create_tf_dataset(data_train, bs=64)
-# val_ds = create_tf_dataset(data_test, bs=1)
-# split = int(len(data) * 0.99)
-# data_train = data[:split]
-# data_test = data[split:]
-#test_LJ = create_tf_dataset(data_test, bs=1)
+split = int(len(data) * 0.80)
+data_train = data[:split]
+print("Size of training data")
+print(sum(1 for d in data_train if d))
+data_test = data[split:]
+print(sum(1 for d in data_test if d))
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs =64)
 
@@ -479,10 +474,10 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'UA.h5')
+            self.model.save_weights(f'LJ_100 epoches.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
-        with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
+        with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
             data.to_excel(writer, sheet_name="Sheet1",header=None, startrow=writer.sheets["Sheet1"].max_row,index=False)
         return score, target_text, prediction, bs
 
@@ -504,7 +499,7 @@ class DisplayOutputs(keras.callbacks.Callback):
             samples += bs
 
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        data.to_excel('ASR Results.xlsx', sheet_name='UA-Speech',index=False)
+        data.to_excel('ASR Results.xlsx', sheet_name='LJ Speech',index=False)
         
         print('Average {} score of ds: {:.2f}\n'.format("WER",  (score / float(samples))))
 
