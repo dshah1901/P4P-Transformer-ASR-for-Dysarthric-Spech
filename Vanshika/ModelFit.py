@@ -16,7 +16,7 @@ print(sum(1 for d in train_data if d))
 test_data = data_test
 print(sum(1 for d in test_data if d))
 ds = create_tf_dataset(train_data, bs=64)
-val_ds = create_tf_dataset(test_data, bs=1)
+val_ds = create_tf_dataset(test_data, bs=64)
 # vectorizer = VectorizeChar(max_target_len)
 # idx_to_char = vectorizer.get_vocabulary()
 # indexes = []
