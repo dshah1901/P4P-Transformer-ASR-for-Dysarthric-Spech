@@ -315,8 +315,8 @@ class Transformer(keras.Model):
             samples += bs
 
 
-        # data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
-        # data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
+        data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
+        data.to_excel('ASR Results.xlsx', sheet_name='Sheet1',index=False)
         
         print('Average {} score of ds: {:.2f}\n'.format("WER", (score / float(samples))))
 
@@ -337,14 +337,9 @@ with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
         text = line.strip().split("|")[2]
         id_to_text[id] = text
 
-
-
-
-
 """
 ## Preprocess the dataset
 """
-
 
 class VectorizeChar:
     def __init__(self, max_len=50):
@@ -585,22 +580,22 @@ learning_rate = CustomSchedule(
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
 
 #loading weights
 
-# # quick model fit to get input shape for loading weights
-# model.fit(val_ds.take(1), epochs=1, verbose=0)
-# model.load_weights(f'LJSPEECH_NEWHYPER.h5')
-# model.summary(); 
-# # for layers in (model.layers)[2]:
-# #     print(layers)
-# #     layers.trainable = False
-# # print((model.layers)[2])
-# ((model.layers)[2]).trainable = False
-# ((model.layers)[3]).trainable = False
-# model.compile(optimizer=optimizer, loss=loss_fn)
-# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=2)
+# quick model fit to get input shape for loading weights
+#model.fit(val_ds.take(1), epochs=1, verbose=0)
+#model.load_weights(f'LJSPEECH_NEWHYPER.h5')
+#model.summary(); 
+# for layers in (model.layers)[2]:
+#     print(layers)
+#     layers.trainable = False
+# print((model.layers)[2])
+#((model.layers)[2]).trainable = False
+#((model.layers)[3]).trainable = False
+#model.compile(optimizer=optimizer, loss=loss_fn)
+#history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
 
 # Plot 
 # Get training and test loss histories
