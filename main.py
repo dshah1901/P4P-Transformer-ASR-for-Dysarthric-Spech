@@ -469,7 +469,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_200 epoches.h5')
+            self.model.save_weights(f'LJ_40 epoches.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -579,7 +579,7 @@ learning_rate = CustomSchedule(
     steps_per_epoch=len(ds),
 )
 optimizer = keras.optimizers.Adam(learning_rate)
-#model.compile(optimizer=optimizer, loss=loss_fn)
+model.compile(optimizer=optimizer, loss=loss_fn)
 #history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
 
 #loading weights
