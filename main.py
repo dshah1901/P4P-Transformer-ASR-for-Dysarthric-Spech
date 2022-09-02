@@ -1,6 +1,6 @@
 import os
 # Making only GPU 1 visible so it only trains on it
-os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+#os.environ["CUDA_VISIBLE_DEVICES"]="1" 
 import random
 from glob import glob
 import tensorflow as tf
@@ -469,7 +469,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_200_epoches.h5')
+            self.model.save_weights(f'LJ_base_40.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -509,7 +509,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
         self,
-        init_lr=0.0000001,
+        init_lr=0.00000001,
         lr_after_warmup=0.00001,
         final_lr=0.0000001,
         warmup_epochs=15,
@@ -580,22 +580,22 @@ learning_rate = CustomSchedule(
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn)
-#history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
 
 #loading weights
 
 # quick model fit to get input shape for loading weights
-model.fit(val_ds.take(1), epochs=1, verbose=0)
-model.load_weights(f'LJ_40_2 epoches.h5')
-model.summary(); 
-# for layers in (model.layers)[2]:
-#     print(layers)
-#     layers.trainable = False
-# print((model.layers)[2])
-#((model.layers)[2]).trainable = False
-#((model.layers)[3]).trainable = False
-model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
+# model.fit(val_ds.take(1), epochs=1, verbose=0)
+# model.load_weights(f'LJ_base_40.h5')
+# model.summary(); 
+# # for layers in (model.layers)[2]:
+# #     print(layers)
+# #     layers.trainable = False
+# # print((model.layers)[2])
+# #((model.layers)[2]).trainable = False
+# #((model.layers)[3]).trainable = False
+# model.compile(optimizer=optimizer, loss=loss_fn)
+# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
 
 # Plot 
 # Get training and test loss histories
