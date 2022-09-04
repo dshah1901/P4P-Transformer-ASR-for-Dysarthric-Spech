@@ -469,7 +469,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_learningrate_3.h5')
+            self.model.save_weights(f'LJ_base_40.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -504,6 +504,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 """
 ## Learning rate schedule
 """
+
 
 class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
@@ -570,9 +571,9 @@ loss_fn = tf.keras.losses.CategoricalCrossentropy(
 )
 
 learning_rate = CustomSchedule(
-    init_lr=0.00000001,
-    lr_after_warmup=0.000001,
-    final_lr=0.00000001,
+    init_lr=0.00001,
+    lr_after_warmup=0.001,
+    final_lr=0.00001,
     warmup_epochs=15,
     decay_epochs=85,
     steps_per_epoch=len(ds),
@@ -583,7 +584,7 @@ history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=4
 
 #loading weights
 
-# quick model fit to get input shape for loading weights
+# # quick model fit to get input shape for loading weights
 # model.fit(val_ds.take(1), epochs=1, verbose=0)
 # model.load_weights(f'LJ_base_40.h5')
 # model.summary(); 
