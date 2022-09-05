@@ -1,17 +1,29 @@
 import os
 # Making only GPU 1 visible so it only trains on it
 #os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+seed_value = 12321 # some number that you manually pick
+os.environ['PYTHONHASHSEED']=str(seed_value)
 import random
 from glob import glob
+import numpy
+numpy.random.seed(seed_value)
+import pandas as pd
 import tensorflow as tf
+tf.random.set_seed(seed_value)
 from tensorflow import keras
 from tensorflow.keras import layers
-import numpy
-import pandas as pd
 from matplotlib import pyplot as plt
 from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
 from jiwer import wer
+import random
+random.seed(seed_value)
+
+from keras import backend as K
+session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
+K.set_session(sess)
+
 
 """
 ## Define the Transformer Input Layer
@@ -72,8 +84,8 @@ class TransformerEncoder(layers.Layer):
         )
         self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1 = layers.Dropout(rate)
-        self.dropout2 = layers.Dropout(rate)
+        self.dropout1 = layers.Dropout(rate, seed=seed_value)
+        self.dropout2 = layers.Dropout(rate, seed=seed_value)
 
         #second 
         self.att_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
@@ -85,8 +97,8 @@ class TransformerEncoder(layers.Layer):
         )
         self.layernorm1_1 = layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2_1 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1_1 = layers.Dropout(rate)
-        self.dropout2_1 = layers.Dropout(rate)
+        self.dropout1_1 = layers.Dropout(rate, seed=seed_value)
+        self.dropout2_1 = layers.Dropout(rate, seed=seed_value)
 
     def call(self, inputs, training):
         attn_output = self.att(inputs, inputs) #multi head attention
@@ -123,9 +135,9 @@ class TransformerDecoder(layers.Layer):
             num_heads=num_heads, key_dim=embed_dim
         )
         self.enc_att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        self.self_dropout = layers.Dropout(0.5)
-        self.enc_dropout = layers.Dropout(0.1)
-        self.ffn_dropout = layers.Dropout(0.1)
+        self.self_dropout = layers.Dropout(0.5, seed=seed_value)
+        self.enc_dropout = layers.Dropout(0.1, seed=seed_value)
+        self.ffn_dropout = layers.Dropout(0.1, seed=seed_value)
         self.ffn = keras.Sequential(
             [
                 layers.Dense(feed_forward_dim, activation="relu"),
@@ -469,7 +481,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_base_40.h5')
+            self.model.save_weights(f'LJ_40_withseed.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -584,7 +596,7 @@ history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=4
 
 #loading weights
 
-# # quick model fit to get input shape for loading weights
+# quick model fit to get input shape for loading weights
 # model.fit(val_ds.take(1), epochs=1, verbose=0)
 # model.load_weights(f'LJ_base_40.h5')
 # model.summary(); 
