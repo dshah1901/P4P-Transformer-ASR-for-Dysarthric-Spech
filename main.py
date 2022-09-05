@@ -481,7 +481,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_40_withseed.h5')
+            self.model.save_weights(f'LJ_40+200+L3_withseed.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -583,31 +583,31 @@ loss_fn = tf.keras.losses.CategoricalCrossentropy(
 )
 
 learning_rate = CustomSchedule(
-    init_lr=0.00001,
-    lr_after_warmup=0.001,
-    final_lr=0.00001,
+    init_lr=0.00000001,
+    lr_after_warmup=0.000001,
+    final_lr=0.00000001,
     warmup_epochs=15,
     decay_epochs=85,
     steps_per_epoch=len(ds),
 )
 optimizer = keras.optimizers.Adam(learning_rate)
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
+#history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=40)
 
 #loading weights
 
 # quick model fit to get input shape for loading weights
-# model.fit(val_ds.take(1), epochs=1, verbose=0)
-# model.load_weights(f'LJ_base_40.h5')
-# model.summary(); 
-# # for layers in (model.layers)[2]:
-# #     print(layers)
-# #     layers.trainable = False
-# # print((model.layers)[2])
-# #((model.layers)[2]).trainable = False
-# #((model.layers)[3]).trainable = False
-# model.compile(optimizer=optimizer, loss=loss_fn)
-# history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
+model.fit(val_ds.take(1), epochs=1, verbose=0)
+model.load_weights(f'LJ_40_withseed.h5')
+model.summary(); 
+# for layers in (model.layers)[2]:
+#     print(layers)
+#     layers.trainable = False
+# print((model.layers)[2])
+#((model.layers)[2]).trainable = False
+#((model.layers)[3]).trainable = False
+model.compile(optimizer=optimizer, loss=loss_fn)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
 
 # Plot 
 # Get training and test loss histories
