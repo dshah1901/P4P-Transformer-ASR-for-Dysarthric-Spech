@@ -21,7 +21,6 @@ def get_audio_path_UA(speaker):
     :return: list of strings
                 the strings represent file paths.
     """
-    print(glob("./UASPEECH/audio/control/{}/*.wav".format(speaker)))
     return glob("./UASPEECH/audio/control/{}/*.wav".format(speaker), recursive=True)
 
 

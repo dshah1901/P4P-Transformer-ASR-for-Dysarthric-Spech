@@ -1,28 +1,17 @@
 import os
 # Making only GPU 1 visible so it only trains on it
-#os.environ["CUDA_VISIBLE_DEVICES"]="1" 
-seed_value = 12321 # some number that you manually pick
-os.environ['PYTHONHASHSEED']=str(seed_value)
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1" 
 import random
 from glob import glob
 import numpy
-numpy.random.seed(seed_value)
 import pandas as pd
 import tensorflow as tf
-tf.random.set_seed(seed_value)
 from tensorflow import keras
 from tensorflow.keras import layers
 from matplotlib import pyplot as plt
 from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
 from jiwer import wer
-import random
-random.seed(seed_value)
-
-from keras import backend as K
-session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
-K.set_session(sess)
 
 
 """
@@ -84,8 +73,8 @@ class TransformerEncoder(layers.Layer):
         )
         self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1 = layers.Dropout(rate, seed=seed_value)
-        self.dropout2 = layers.Dropout(rate, seed=seed_value)
+        self.dropout1 = layers.Dropout(rate)
+        self.dropout2 = layers.Dropout(rate)
 
         #second 
         self.att_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
@@ -97,8 +86,8 @@ class TransformerEncoder(layers.Layer):
         )
         self.layernorm1_1 = layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2_1 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1_1 = layers.Dropout(rate, seed=seed_value)
-        self.dropout2_1 = layers.Dropout(rate, seed=seed_value)
+        self.dropout1_1 = layers.Dropout(rate)
+        self.dropout2_1 = layers.Dropout(rate)
 
     def call(self, inputs, training):
         attn_output = self.att(inputs, inputs) #multi head attention
@@ -124,7 +113,6 @@ class TransformerEncoder(layers.Layer):
 ## Transformer Decoder Layer
 """
 
-
 class TransformerDecoder(layers.Layer):
     def __init__(self, embed_dim, num_heads, feed_forward_dim, dropout_rate=0.1):
         super().__init__()
@@ -135,9 +123,9 @@ class TransformerDecoder(layers.Layer):
             num_heads=num_heads, key_dim=embed_dim
         )
         self.enc_att = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
-        self.self_dropout = layers.Dropout(0.5, seed=seed_value)
-        self.enc_dropout = layers.Dropout(0.1, seed=seed_value)
-        self.ffn_dropout = layers.Dropout(0.1, seed=seed_value)
+        self.self_dropout = layers.Dropout(0.5)
+        self.enc_dropout = layers.Dropout(0.1)
+        self.ffn_dropout = layers.Dropout(0.1)
         self.ffn = keras.Sequential(
             [
                 layers.Dense(feed_forward_dim, activation="relu"),
@@ -181,7 +169,6 @@ During training, we give the decoder the target character sequence shifted to th
 as input. During inference, the decoder uses its own past predictions to predict the
 next token.
 """
-
 
 class Transformer(keras.Model):
     def __init__(
@@ -375,12 +362,12 @@ class VectorizeChar:
     def get_vocabulary(self):
         return self.vocab
 
-#SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
-#SPEAKERS_TEST = ['CM06']
+SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+SPEAKERS_TEST = ['CM06']
 max_target_len = 200  # all transcripts in out data are < 200 characters
-# data_train = get_dataset_UA(SPEAKERS_TRAIN)
-# data_test = get_dataset_UA(SPEAKERS_TEST)
-data = get_data(wavs, id_to_text, max_target_len)
+data_train = get_dataset_UA(SPEAKERS_TRAIN)
+data_test = get_dataset_UA(SPEAKERS_TEST)
+#data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
 
@@ -427,12 +414,12 @@ def create_tf_dataset(data, bs=4):
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-
-split = int(len(data) * 0.80)
-data_train = data[:split]
-print("Size of training data")
+# Dividing LJ Speech into 80 training 20 testing as it has only one speaker.
+# split = int(len(data) * 0.80)
+# data_train = data[:split]
+# print("Size of training data")
 print(sum(1 for d in data_train if d))
-data_test = data[split:]
+# data_test = data[split:]
 print(sum(1 for d in data_test if d))
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs =64)
@@ -441,7 +428,6 @@ val_ds = create_tf_dataset(data_test, bs =64)
 """
 ## Callbacks to display predictions
 """
-
 
 class DisplayOutputs(keras.callbacks.Callback):
     def __init__(
@@ -481,10 +467,10 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ_40+200+L3_withseed.h5')
+            self.model.save_weights(f'LJ200_UAControl_FreezeE1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
-        with pd.ExcelWriter("LJ Speech Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
+        with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
             data.to_excel(writer, sheet_name="Sheet1",header=None, startrow=writer.sheets["Sheet1"].max_row,index=False)
         return score, target_text, prediction, bs
 
@@ -516,7 +502,6 @@ class DisplayOutputs(keras.callbacks.Callback):
 """
 ## Learning rate schedule
 """
-
 
 class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
     def __init__(
@@ -555,7 +540,6 @@ class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
         epoch = step // self.steps_per_epoch
         return self.calculate_lr(epoch)
 
-
 """
 ## Create & train the end-to-end model
 """
@@ -583,9 +567,9 @@ loss_fn = tf.keras.losses.CategoricalCrossentropy(
 )
 
 learning_rate = CustomSchedule(
-    init_lr=0.00000001,
-    lr_after_warmup=0.000001,
-    final_lr=0.00000001,
+    init_lr=0.00001,
+    lr_after_warmup=0.001,
+    final_lr=0.00001,
     warmup_epochs=15,
     decay_epochs=85,
     steps_per_epoch=len(ds),
@@ -598,7 +582,7 @@ model.compile(optimizer=optimizer, loss=loss_fn)
 
 # quick model fit to get input shape for loading weights
 model.fit(val_ds.take(1), epochs=1, verbose=0)
-model.load_weights(f'LJ_40_withseed.h5')
+model.load_weights(f'LJ_200.h5')
 model.summary(); 
 # for layers in (model.layers)[2]:
 #     print(layers)
@@ -606,8 +590,10 @@ model.summary();
 # print((model.layers)[2])
 #((model.layers)[2]).trainable = False
 #((model.layers)[3]).trainable = False
+((model.encoder.layers)[1]).trainable = False;
+model.summary(); 
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=200)
+history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
 
 # Plot 
 # Get training and test loss histories
@@ -625,14 +611,3 @@ plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.savefig("training vs loss.png")
 plt.show()
-
-"""
-In practice, you should train for around 100 epochs or more.
-Some of the predicted text at or around epoch 35 may look as follows:
-```
-target:     <as they sat in the car, frazier asked oswald where his lunch was>
-prediction: <as they sat in the car frazier his lunch ware mis lunch was>
-target:     <under the entry for may one, nineteen sixty,>
-prediction: <under the introus for may monee, nin the sixty,>
-```
-"""
