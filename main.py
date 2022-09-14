@@ -467,7 +467,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ200_2.0_UAControl_FreezeD123.h5')
+            self.model.save_weights(f'LJ200_2.0_UAControl_FreezeTokenD123SEC1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -588,11 +588,13 @@ model.summary();
 #     print(layers)
 #     layers.trainable = False
 # print((model.layers)[1]) #Token embeddings
-# print((model.layers)[2]) #Sequential
+# print((model.layers)[2]) #Sequential (encoder)
 # print((model.layers)[3]) #Transformer decoder
 # print((model.layers)[4]) #Transformer decoder
 # print((model.layers)[5]) #Transformer decoder
 # print((model.layers)[6]) #dense
+(model.enc_input.conv1).trainable = False
+((model.layers)[2]).trainable = False
 ((model.layers)[3]).trainable = False
 ((model.layers)[4]).trainable = False
 ((model.layers)[5]).trainable = False
