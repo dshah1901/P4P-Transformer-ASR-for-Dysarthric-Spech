@@ -21,6 +21,7 @@ def get_audio_path_UA(speaker):
     :return: list of strings
                 the strings represent file paths.
     """
+    print("./UASPEECH/audio/Dysarthric/{}/*.wav".format(speaker))
     return glob("./UASPEECH/audio/Dysarthric/{}/*.wav".format(speaker), recursive=True)
 
 
@@ -64,9 +65,8 @@ def get_data_UA(wavs):
             continue
         elif block == 'B1' or block == 'B2':
             data_train.append({'audio': wav, 'text': text})
-        elif block == 'B3'
+        elif block == 'B3':
             data_test.append({'audio': wav, 'text': text})
-
 
     return data_train,data_test, removed_files
 

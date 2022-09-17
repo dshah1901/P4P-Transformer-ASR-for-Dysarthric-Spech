@@ -1,6 +1,6 @@
 import os
 # Making only GPU 1 visible so it only trains on it
-os.environ["CUDA_VISIBLE_DEVICES"]="1" 
+os.environ["CUDA_VISIBLE_DEVICES"]="3,4" 
 import random
 from glob import glob
 import numpy
@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from matplotlib import pyplot as plt
-from LJ_SPeech_preprocess import *
+# from LJ_SPeech_preprocess import *
 from UA_Speech_preprocess import *
 from jiwer import wer
 
@@ -326,15 +326,15 @@ Note: This requires ~3.6 GB of disk space and
 takes ~5 minutes for the extraction of files.
 """
 
-saveto = "./datasets/LJSpeech-1.1"
-wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
+# saveto = "./datasets/LJSpeech-1.1"
+# wavs = glob("{}/**/*.wav".format(saveto), recursive=True)
 
-id_to_text = {}
-with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
-    for line in f:
-        id = line.strip().split("|")[0]
-        text = line.strip().split("|")[2]
-        id_to_text[id] = text
+# id_to_text = {}
+# with open(os.path.join(saveto, "metadata.csv"), encoding="utf-8") as f:
+#     for line in f:
+#         id = line.strip().split("|")[0]
+#         text = line.strip().split("|")[2]
+#         id_to_text[id] = text
 
 """
 ## Preprocess the dataset
@@ -364,7 +364,7 @@ class VectorizeChar:
 
 # SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
 # SPEAKERS_TEST = ['CM06']
-SPEAKER = ['CF02']
+SPEAKER = ['F02']
 max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_dataset_UA(SPEAKER)
 #data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
@@ -417,9 +417,10 @@ def create_tf_dataset(data, bs=4):
 # Dividing LJ Speech into 80 training 20 testing as it has only one speaker.
 # split = int(len(data) * 0.80)
 # data_train = data[:split]
-# print("Size of training data")
+print("Size of training data")
 print(sum(1 for d in data_train if d))
 # data_test = data[split:]
+print("Size of testing data")
 print(sum(1 for d in data_test if d))
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs =64)
@@ -467,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ200_2.0_UAControl_FreezeTokenD123_2.0.h5')
+            self.model.save_weights(f'F02_E1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -582,7 +583,7 @@ model.compile(optimizer=optimizer, loss=loss_fn)
 
 # quick model fit to get input shape for loading weights
 model.fit(val_ds.take(1), epochs=1, verbose=0)
-model.load_weights(f'LJ200_2.0.h5')
+model.load_weights(f'LJ200_2.0_UAControl_FreezeTokenD123.h5')
 model.summary(); 
 # for layers in (model.layers)[2]:
 #     print(layers)
@@ -594,11 +595,12 @@ model.summary();
 # print((model.layers)[5]) #Transformer decoder
 # print((model.layers)[6]) #dense
 
-((model.layers)[1]).trainable = False
-((model.layers)[3]).trainable = False
-((model.layers)[4]).trainable = False
-((model.layers)[5]).trainable = False
+# ((model.layers)[1]).trainable = False
+# ((model.layers)[3]).trainable = False
+# ((model.layers)[4]).trainable = False
+# ((model.layers)[5]).trainable = False
 
+((model.encoder.layers)[1]).trainable = False;
 # ((model.encoder.layers)[2]).trainable = False;
 # ((model.encoder.layers)[3]).trainable = False;
 # ((model.encoder.layers)[4]).trainable = False;
