@@ -362,11 +362,11 @@ class VectorizeChar:
     def get_vocabulary(self):
         return self.vocab
 
-SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
-SPEAKERS_TEST = ['CM06']
+# SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
+# SPEAKERS_TEST = ['CM06']
+SPEAKER = ['CF02']
 max_target_len = 200  # all transcripts in out data are < 200 characters
-data_train = get_dataset_UA(SPEAKERS_TRAIN)
-data_test = get_dataset_UA(SPEAKERS_TEST)
+data_train, data_test = get_dataset_UA(SPEAKER)
 #data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
 vectorizer = VectorizeChar(max_target_len)
 print("vocab size", len(vectorizer.get_vocabulary()))
@@ -467,7 +467,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'LJ200_2.0_UAControl_FreezeTokenD123SEC1.h5')
+            self.model.save_weights(f'LJ200_2.0_UAControl_FreezeTokenD123_2.0.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -593,8 +593,8 @@ model.summary();
 # print((model.layers)[4]) #Transformer decoder
 # print((model.layers)[5]) #Transformer decoder
 # print((model.layers)[6]) #dense
-(model.enc_input.conv1).trainable = False
-((model.layers)[2]).trainable = False
+
+((model.layers)[1]).trainable = False
 ((model.layers)[3]).trainable = False
 ((model.layers)[4]).trainable = False
 ((model.layers)[5]).trainable = False
