@@ -468,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'M04_E12345.h5')
+            self.model.save_weights(f'M04_TE.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -585,9 +585,7 @@ model.compile(optimizer=optimizer, loss=loss_fn)
 model.fit(val_ds.take(1), epochs=1, verbose=0)
 model.load_weights(f'LJ200_2.0_UAControl_FreezeTokenD123.h5')
 model.summary(); 
-# for layers in (model.layers)[2]:
-#     print(layers)
-#     layers.trainable = False
+
 # print((model.layers)[1]) #Token embeddings
 # print((model.layers)[2]) #Sequential (encoder)
 # print((model.layers)[3]) #Transformer decoder
@@ -595,17 +593,19 @@ model.summary();
 # print((model.layers)[5]) #Transformer decoder
 # print((model.layers)[6]) #dense
 
-# ((model.layers)[1]).trainable = False
+# Encoder Layer Freezing 
+# ((model.encoder.layers)[1]).trainable = False;
+# ((model.encoder.layers)[2]).trainable = False;
+# ((model.encoder.layers)[3]).trainable = False;
+# ((model.encoder.layers)[4]).trainable = False;
+# ((model.encoder.layers)[5]).trainable = False;
+
+((model.layers)[1]).trainable = False
 # ((model.layers)[3]).trainable = False
 # ((model.layers)[4]).trainable = False
 # ((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
 
-((model.encoder.layers)[1]).trainable = False;
-((model.encoder.layers)[2]).trainable = False;
-((model.encoder.layers)[3]).trainable = False;
-((model.encoder.layers)[4]).trainable = False;
-((model.encoder.layers)[5]).trainable = False;
 model.summary(); 
 model.compile(optimizer=optimizer, loss=loss_fn)
 history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
