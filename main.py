@@ -364,7 +364,7 @@ class VectorizeChar:
 
 # SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
 # SPEAKERS_TEST = ['CM06']
-SPEAKER = ['F03']
+SPEAKER = ['M12']
 max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_dataset_UA(SPEAKER)
 #data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
@@ -468,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'F03_TE+D123.h5')
+            self.model.save_weights(f'M12_E1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -594,35 +594,35 @@ model.summary();
 # print((model.layers)[6]) #dense
 
 # Encoder Layer Freezing 
-# ((model.encoder.layers)[1]).trainable = False;
+((model.encoder.layers)[1]).trainable = False;
 # ((model.encoder.layers)[2]).trainable = False;
 # ((model.encoder.layers)[3]).trainable = False;
 # ((model.encoder.layers)[4]).trainable = False;
 # ((model.encoder.layers)[5]).trainable = False;
 
-((model.layers)[1]).trainable = False
-((model.layers)[3]).trainable = False
-((model.layers)[4]).trainable = False
-((model.layers)[5]).trainable = False
+# ((model.layers)[1]).trainable = False
+# ((model.layers)[3]).trainable = False
+# ((model.layers)[4]).trainable = False
+# ((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
 
 model.summary(); 
 model.compile(optimizer=optimizer, loss=loss_fn)
-history = model.fit(ds, validation_data=val_ds, callbacks=[display_cb], epochs=100)
+history = model.fit(ds, callbacks=[display_cb], epochs=100)
 
 # Plot 
 # Get training and test loss histories
 training_loss = history.history['loss']
-test_loss = history.history['val_loss']
+# test_loss = history.history['val_loss']
 
 # Create count of the number of epochs
 epoch_count = range(1, len(training_loss) + 1)
 
 # Visualize loss history
 plt.plot(epoch_count, training_loss, 'r--')
-plt.plot(epoch_count, test_loss, 'b-')
-plt.legend(['Training Loss', 'Test Loss'])
+# plt.plot(epoch_count, test_loss, 'b-')
+plt.legend(['Training Loss'])
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
-plt.savefig("training vs loss.png")
+plt.savefig("training loss.png")
 plt.show()
