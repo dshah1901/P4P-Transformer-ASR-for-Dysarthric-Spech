@@ -468,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'M11_TE+D12.h5')
+            self.model.save_weights(f'M11_TE+D123.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -602,7 +602,7 @@ model.summary();
 ((model.layers)[1]).trainable = False
 ((model.layers)[3]).trainable = False
 ((model.layers)[4]).trainable = False
-# ((model.layers)[5]).trainable = False
+((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
 
 model.summary(); 
