@@ -468,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'M09_TE.h5')
+            self.model.save_weights(f'M09_TE+D1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -495,7 +495,7 @@ class DisplayOutputs(keras.callbacks.Callback):
         data = pd.DataFrame({"A":target,"B":prediction,"C":word_error_rate})
         data.to_excel('ASR Results.xlsx', sheet_name='LJ Speech',index=False)
         
-        print('Average {} score of ds: {:.2f}\n'.format("WER",  (score / float(samples))))
+        print('Final Average {} score of ds: {:.2f}\n'.format("WER",  (score / float(samples))))
 
         return (score / float(samples))
 
@@ -600,7 +600,7 @@ model.summary();
 # ((model.encoder.layers)[5]).trainable = False;
 
 ((model.layers)[1]).trainable = False
-# ((model.layers)[3]).trainable = False
+((model.layers)[3]).trainable = False
 # ((model.layers)[4]).trainable = False
 # ((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
