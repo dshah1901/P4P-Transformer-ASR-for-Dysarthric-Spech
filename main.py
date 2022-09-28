@@ -364,7 +364,7 @@ class VectorizeChar:
 
 # SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
 # SPEAKERS_TEST = ['CM06']
-SPEAKER = ['F04']
+SPEAKER = ['M09']
 max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_dataset_UA(SPEAKER)
 #data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
@@ -468,7 +468,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'F04_TE+D123.h5')
+            self.model.save_weights(f'M09_E1.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
@@ -593,16 +593,16 @@ model.summary();
 # print((model.layers)[6]) #dense
 
 # Encoder Layer Freezing 
-# ((model.encoder.layers)[1]).trainable = False;
+((model.encoder.layers)[1]).trainable = False;
 # ((model.encoder.layers)[2]).trainable = False;
 # ((model.encoder.layers)[3]).trainable = False;
 # ((model.encoder.layers)[4]).trainable = False;
 # ((model.encoder.layers)[5]).trainable = False;
 
-((model.layers)[1]).trainable = False
-((model.layers)[3]).trainable = False
-((model.layers)[4]).trainable = False
-((model.layers)[5]).trainable = False
+# ((model.layers)[1]).trainable = False
+# ((model.layers)[3]).trainable = False
+# ((model.layers)[4]).trainable = False
+# ((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
 
 model.summary(); 
