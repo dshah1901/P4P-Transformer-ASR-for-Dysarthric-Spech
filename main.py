@@ -430,11 +430,11 @@ for index in indexes:
 # Dividing LJ Speech into 80 training 20 testing as it has only one speaker.
 # split = int(len(data) * 0.80)
 # data_train = data[:split]
-# print("Size of training data")
-# print(sum(1 for d in data_train if d))
+print("Size of training data")
+print(sum(1 for d in data_train if d))
 # # data_test = data[split:]
-# print("Size of testing data")
-# print(sum(1 for d in data_test if d))
+print("Size of testing data")
+print(sum(1 for d in data_test if d))
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs =64)
 
@@ -481,7 +481,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'F05_D3.h5')
+            self.model.save_weights(f'Augmented_F05_D3.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
