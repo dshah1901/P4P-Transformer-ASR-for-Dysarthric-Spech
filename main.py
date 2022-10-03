@@ -414,14 +414,27 @@ def create_tf_dataset(data, bs=4):
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
+indexes = []
+audio_ds = create_audio_ds(data_train)   
+for index,val in enumerate(list(audio_ds)):
+    df = pd.DataFrame(val)   
+    if(df.isnull().sum().sum() > 0):
+        indexes.append(index)
+
+indexes = sorted(indexes, reverse=True)
+# Traverse the indices list
+for index in indexes:
+    if index < len(data_train):
+        data_train.pop(index)
+
 # Dividing LJ Speech into 80 training 20 testing as it has only one speaker.
 # split = int(len(data) * 0.80)
 # data_train = data[:split]
-print("Size of training data")
-print(sum(1 for d in data_train if d))
-# data_test = data[split:]
-print("Size of testing data")
-print(sum(1 for d in data_test if d))
+# print("Size of training data")
+# print(sum(1 for d in data_train if d))
+# # data_test = data[split:]
+# print("Size of testing data")
+# print(sum(1 for d in data_test if d))
 ds = create_tf_dataset(data_train, bs=64)
 val_ds = create_tf_dataset(data_test, bs =64)
 

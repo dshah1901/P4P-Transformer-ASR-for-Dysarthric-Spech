@@ -21,8 +21,9 @@ Permissible noise factor value = x > 0.004
 '''
 def inject_noise(data):
     wav, sr = librosa.load(data, sr=16000)
-    augmented_data = wav + 0.009 * np.random.normal(0,1,len(wav))
-    ipd.Audio(augmented_data,rate=sr)
+    augmented_data = wav + 0.009 * np.random.rand(len(wav))
+    # Cast back to same data type
+    augmented_data = augmented_data.astype(type(wav[0]))
     speaker, block, word_key, mic = data.split('_')
     speaker = data.split('/')[4]
     mic, extention =  mic.split('.')
@@ -38,7 +39,6 @@ Permissible factor values = sr/10
 def shift_time(data):
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = np.roll(wav,int(sr/10))
-    ipd.Audio(augmented_data,rate=sr)
     speaker, block, word_key, mic = data.split('_')
     speaker = data.split('/')[4]
     mic, extention =  mic.split('.')
@@ -54,7 +54,6 @@ Permissible factor values = 0 < x < 1.0
 def time_stretch(data):
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = librosa.effects.time_stretch(wav,0.4)
-    ipd.Audio(augmented_data,rate=sr)
     speaker, block, word_key, mic = data.split('_')
     speaker = data.split('/')[4]
     mic, extention =  mic.split('.')
@@ -70,12 +69,9 @@ Permissible factor values = -5 <= x <= 5
 def shift_pitch(data):
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = librosa.effects.pitch_shift(wav,sr,n_steps=-5)
-    ipd.Audio(augmented_data,rate=sr)
     speaker, block, word_key, mic = data.split('_')
     speaker = data.split('/')[4]
     mic, extention =  mic.split('.')
     augmented_audio = "./UASPEECH/audio/DataAugmentation/"+speaker+"/"+speaker+"_"+block+"_"+word_key+"_"+mic+"_"+"shifted_pitch." +extention
     sf.write(augmented_audio, augmented_data, sr, 'PCM_16')
-    return augmented_data
-
-
+    return augmented_audio
