@@ -9,7 +9,6 @@ from scipy.io.wavfile import write
 import IPython.display as ipd
 
 # Reference: https://medium.com/@keur.plkar/audio-data-augmentation-in-python-a91600613e47
-# https://medium.com/@makcedward/data-augmentation-for-audio-76912b01fdf6 
 
 # Noise Injection
 
@@ -32,7 +31,7 @@ def inject_noise(data){
 '''
 Permissible factor values = sr/10
 '''
-def shift_time(wav){
+def shift_time(data){
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = np.roll(wav,int(sr/10))
     ipd.Audio(wav_roll,rate=sr)
@@ -40,16 +39,27 @@ def shift_time(wav){
     return augmented_data
 }
 
-# Changing Pitch
-
-def change_pitch(){
-    return librosa.effects.pitch_shift(data, sampling_rate, pitch_factor)
-}
-
 # Time Stretching
-def time_stretching(){
-    augment = Compose([
-        TimeStretch(min_rate=0.8, max_rate=1.25, p=0.5),
-    ])
-    augmented_audio = augment(samples=wav, sample_rate=16000)
+'''
+Permissible factor values = 0 < x < 1.0
+'''
+def time_stretching(data){
+    wav, sr = librosa.load(data, sr=16000)
+    augmented_data = librosa.effects.time_stretch(wav,0.4)
+    ipd.Audio(wav_time_stch,rate=sr)
+    librosa.output.write_wav('./time_stretch.wav',wav_time_stch,sr)
+    return augmented_data
 }
+
+# Shifting Pitch
+'''
+Permissible factor values = -5 <= x <= 5
+'''
+def change_pitch(data){
+    wav, sr = librosa.load(data, sr=16000)
+    augmented_data = librosa.effects.pitch_shift(wav,sr,n_steps=-5)
+    ipd.Audio(wav_pitch_sf,rate=sr)
+    librosa.output.write_wav('./pitch_shift.wav',wav_pitch_sf,sr)
+    return augmented_data
+}
+
