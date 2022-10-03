@@ -68,7 +68,7 @@ def get_data_UA(wavs):
             aug_noise = inject_noise(wav)
             aug_timeShift = shift_time(wav)
             aug_timeStretch = time_stretch(wav)
-            aug_pitchShift = pitch_shift(wav)
+            aug_pitchShift = shift_pitch(wav)
             data_train.append({'aug_noise': wav, 'text': text})
             data_train.append({'aug_timeShift': wav, 'text': text})
             data_train.append({'aug_timeStretch': wav, 'text': text})
