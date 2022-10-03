@@ -12,6 +12,7 @@ import librosa
 import re
 import pandas as pd
 import numpy as np
+from data_augmentation import *
 
 def get_audio_path_UA(speaker):
     """
@@ -64,6 +65,14 @@ def get_data_UA(wavs):
         if text == -1:
             continue
         elif block == 'B1' or block == 'B2':
+            aug_noise = inject_noise(wav)
+            aug_timeShift = shift_time(wav)
+            aug_timeStretch = time_stretch(wav)
+            aug_pitchShift = pitch_shift(wav)
+            data_train.append({'aug_noise': wav, 'text': text})
+            data_train.append({'aug_timeShift': wav, 'text': text})
+            data_train.append({'aug_timeStretch': wav, 'text': text})
+            data_train.append({'aug_pitchShift': wav, 'text': text})
             data_train.append({'audio': wav, 'text': text})
         elif block == 'B3':
             data_test.append({'audio': wav, 'text': text})

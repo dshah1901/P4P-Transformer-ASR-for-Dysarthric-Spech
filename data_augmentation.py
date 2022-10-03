@@ -43,7 +43,7 @@ def shift_time(data){
 '''
 Permissible factor values = 0 < x < 1.0
 '''
-def time_stretching(data){
+def time_stretch(data){
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = librosa.effects.time_stretch(wav,0.4)
     ipd.Audio(wav_time_stch,rate=sr)
@@ -55,7 +55,7 @@ def time_stretching(data){
 '''
 Permissible factor values = -5 <= x <= 5
 '''
-def change_pitch(data){
+def shift_pitch(data){
     wav, sr = librosa.load(data, sr=16000)
     augmented_data = librosa.effects.pitch_shift(wav,sr,n_steps=-5)
     ipd.Audio(wav_pitch_sf,rate=sr)
