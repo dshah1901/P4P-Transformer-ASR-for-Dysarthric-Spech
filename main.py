@@ -609,13 +609,13 @@ model.summary();
 # ((model.encoder.layers)[1]).trainable = False;
 # ((model.encoder.layers)[2]).trainable = False;
 # ((model.encoder.layers)[3]).trainable = False;
-((model.encoder.layers)[4]).trainable = False;
+# ((model.encoder.layers)[4]).trainable = False;
 # ((model.encoder.layers)[5]).trainable = False;
 
 # ((model.layers)[1]).trainable = False
 # ((model.layers)[3]).trainable = False
 # ((model.layers)[4]).trainable = False
-# ((model.layers)[5]).trainable = False
+((model.layers)[5]).trainable = False
 # ((model.layers)[6]).trainable = False
 
 model.summary(); 
