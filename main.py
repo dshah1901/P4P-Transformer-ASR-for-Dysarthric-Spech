@@ -364,7 +364,7 @@ class VectorizeChar:
 
 # SPEAKERS_TRAIN = ['CF03', 'CF04', 'CF05', 'CF02', 'CM01', 'CM04', 'CM05', 'CM08', 'CM09', 'CM10']
 # SPEAKERS_TEST = ['CM06']
-SPEAKER = ['M09']
+SPEAKER = ['F04']
 max_target_len = 200  # all transcripts in out data are < 200 characters
 data_train, data_test = get_dataset_UA(SPEAKER)
 #data = get_data(wavs, id_to_text, max_target_len) #Getting data for LJ Speech
@@ -481,7 +481,7 @@ class DisplayOutputs(keras.callbacks.Callback):
 
             print('{} score of one validation batch: {:.2f}\n'.format("WER", float(wer(target_text, prediction))))
 
-            self.model.save_weights(f'Augmented_M09_TE.h5')
+            self.model.save_weights(f'Augmented_F04_TE.h5')
         print('{} total score of one validation batch: {:.2f}\n'.format("WER", (score)/float(bs)))
         data = pd.DataFrame({"A":epoch,"B":(score)/float(bs)}, index=[0])
         with pd.ExcelWriter("Epoch Accuracy.xlsx",mode="a",engine="openpyxl",if_sheet_exists="overlay") as writer:
